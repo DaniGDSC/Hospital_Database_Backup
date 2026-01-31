@@ -1,0 +1,27 @@
+# Logs
+logs/*.log
+*.log
+
+# Certificates (NEVER commit these!)
+certificates-backup/*
+*.cer
+*.pvk
+*.pfx
+
+# AWS Credentials (SECURITY: Never commit!)
+backup-admin_*.csv
+.aws/
+~/.aws/
+
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Temporary files
+temp/
+tmp/
