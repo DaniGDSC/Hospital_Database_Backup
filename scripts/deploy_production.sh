@@ -65,6 +65,8 @@ if [ "$CONFIRMATION" != "I approve deployment to production" ]; then
 fi
 
 echo "✓ Approval confirmed"
+"${SCRIPT_DIR}/utilities/send_telegram.sh" "INFO" "Deployment Started" \
+    "Deployer: ${DEPLOYER}, Approver: ${DEPLOY_APPROVER}, Commit: ${GIT_COMMIT}" || true
 echo ""
 
 # ============================================
@@ -135,10 +137,14 @@ echo "{\"timestamp\":\"${TIMESTAMP}\",\"deployer\":\"${DEPLOYER}\",\"approver\":
 echo ""
 echo "═══════════════════════════════════════════════════"
 if [ "$DEPLOY_STATUS" = "SUCCESS" ]; then
+    "${SCRIPT_DIR}/utilities/send_telegram.sh" "INFO" "Deployment SUCCESS" \
+        "Phase: ${PHASE_DEPLOYED}, Commit: ${GIT_COMMIT}, Deployer: ${DEPLOYER}" || true
     echo "✓ Production deployment completed successfully"
     echo "  Logged to: ${DEPLOY_LOG}"
     exit 0
 else
+    "${SCRIPT_DIR}/utilities/send_telegram.sh" "CRITICAL" "Deployment FAILED" \
+        "Phase: ${PHASE_DEPLOYED}, Error: ${DEPLOY_ERROR}, Commit: ${GIT_COMMIT}" || true
     echo "✗ Deployment FAILED: ${DEPLOY_ERROR}"
     echo "  Logged to: ${DEPLOY_LOG}"
     echo "  Review logs and consider rollback: scripts/utilities/emergency_rollback.sh"

@@ -1,0 +1,4 @@
+# Hospital Database Metrics Export — run every 60 seconds
+# Install: crontab config/crontab-metrics
+# Or add to existing crontab: crontab -l | cat - config/crontab-metrics | crontab -
+* * * * * /home/un1/project/Hospital_Database_Backup-main/scripts/utilities/export_metrics.sh >/dev/null 2>&1

@@ -68,10 +68,14 @@ BEGIN
     
     INSERT INTO tempdb.dbo.DisasterDetectionLog (DatabaseName, EventType, StateDescription, Message)
     VALUES (@dbName, ''DISASTER'', ''DATABASE_MISSING'', @alertMsg);
-    
-    -- TODO: Trigger auto-recovery job if enabled (manual step required)
-    -- EXEC msdb.dbo.sp_start_job @job_name = ''HospitalBackup_AutoRecovery'';
-    
+
+    -- Telegram: database missing — critical disaster
+    IF OBJECT_ID(''HospitalBackupDemo.dbo.usp_SendTelegramAlert'', ''P'') IS NOT NULL
+        EXEC HospitalBackupDemo.dbo.usp_SendTelegramAlert
+            @Severity = N''CRITICAL'',
+            @Title = N''DISASTER: Database Missing'',
+            @Message = @alertMsg;
+
     RETURN; -- Exit; disaster logged
 END
 
@@ -87,6 +91,13 @@ BEGIN
         INSERT INTO tempdb.dbo.DisasterDetectionLog (DatabaseName, EventType, StateDescription, Message)
         VALUES (@dbName, ''WARNING'', @stateDesc, @alertMsg);
     END
+
+    -- Telegram: database not ONLINE
+    IF OBJECT_ID(''HospitalBackupDemo.dbo.usp_SendTelegramAlert'', ''P'') IS NOT NULL
+        EXEC HospitalBackupDemo.dbo.usp_SendTelegramAlert
+            @Severity = N''CRITICAL'',
+            @Title = N''Database NOT ONLINE'',
+            @Message = @alertMsg;
 END
 ELSE
 BEGIN

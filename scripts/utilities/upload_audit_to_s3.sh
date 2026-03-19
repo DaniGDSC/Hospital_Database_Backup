@@ -88,6 +88,8 @@ if [ "$ACTUAL_COUNT" -ge "$UPLOADED_COUNT" ] && [ $UPLOAD_FAILED -eq 0 ]; then
     log "✓ All ${UPLOADED_COUNT} file(s) uploaded and verified"
 else
     log "✗ Verification failed: expected ${UPLOADED_COUNT}, found ${ACTUAL_COUNT}"
+    "${SCRIPT_DIR}/send_telegram.sh" "CRITICAL" "Audit Log Export Failed" \
+        "Audit logs not shipped to S3. HIPAA compliance at risk. Expected: ${UPLOADED_COUNT}, found: ${ACTUAL_COUNT}" || true
     exit 1
 fi
 

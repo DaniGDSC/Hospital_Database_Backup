@@ -1,0 +1,27 @@
+# Grafana alerting contact points
+# Provisioned automatically on startup
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: email
+    receivers:
+      - uid: email-admin
+        type: email
+        settings:
+          addresses: admin@hospital.com
+          singleEmail: true
+
+  - orgId: 1
+    name: telegram
+    receivers:
+      - uid: telegram-bot
+        type: telegram
+        settings:
+          bottoken: ${TELEGRAM_BOT_TOKEN}
+          chatid: ${TELEGRAM_CHAT_ID}
+          message: |
+            🏥 Hospital DB Alert
+            Severity: {{ .CommonLabels.severity }}
+            Alert: {{ .CommonAnnotations.summary }}
+            Details: {{ .CommonAnnotations.description }}

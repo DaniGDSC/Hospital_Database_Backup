@@ -130,10 +130,17 @@ BEGIN
     BEGIN CATCH
         SET @ErrorMessage = ERROR_MESSAGE();
         PRINT CONCAT('ERROR: ', @ErrorMessage);
-        
-        INSERT INTO dbo.SystemConfiguration 
+
+        INSERT INTO dbo.SystemConfiguration
         (ConfigKey, ConfigValue, ConfigCategory, Description, LastModifiedDate)
         VALUES ('LOG_BACKUP_ERROR', @ErrorMessage, 'Backup', 'Hourly log backup validation failed', GETDATE());
+
+        -- Telegram: log backup chain failure — RPO at risk
+        IF OBJECT_ID('dbo.usp_SendTelegramAlert', 'P') IS NOT NULL
+            EXEC dbo.usp_SendTelegramAlert
+                @Severity = N'CRITICAL',
+                @Title = N'Log Backup Chain BROKEN',
+                @Message = @ErrorMessage;
 
         RAISERROR(@ErrorMessage, 16, 1);
     END CATCH;

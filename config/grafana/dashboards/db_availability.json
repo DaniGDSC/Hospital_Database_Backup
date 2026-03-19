@@ -1,0 +1,81 @@
+{
+  "dashboard": {
+    "title": "Database Availability",
+    "uid": "hospital-db-availability",
+    "tags": ["hospital", "database", "availability"],
+    "timezone": "browser",
+    "refresh": "30s",
+    "time": { "from": "now-24h", "to": "now" },
+    "panels": [
+      {
+        "id": 1, "title": "Database Status", "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "targets": [{ "expr": "hospital_db_up", "legendFormat": "Status" }],
+        "fieldConfig": { "defaults": { "mappings": [{ "type": "value", "options": { "1": { "text": "ONLINE", "color": "green" }, "0": { "text": "OFFLINE", "color": "red" } } }] } },
+        "options": { "colorMode": "background", "reduceOptions": { "calcs": ["lastNotNull"] } }
+      },
+      {
+        "id": 2, "title": "Active Connections", "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "targets": [{ "expr": "hospital_db_active_connections", "legendFormat": "Connections" }],
+        "fieldConfig": { "defaults": { "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 50 }, { "color": "red", "value": 100 }] } } },
+        "options": { "colorMode": "background", "reduceOptions": { "calcs": ["lastNotNull"] } }
+      },
+      {
+        "id": 3, "title": "TDE Encryption", "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "targets": [{ "expr": "hospital_security_tde_status", "legendFormat": "TDE" }],
+        "fieldConfig": { "defaults": { "mappings": [{ "type": "value", "options": { "1": { "text": "ENCRYPTED", "color": "green" }, "0": { "text": "NOT ENCRYPTED", "color": "red" } } }] } },
+        "options": { "colorMode": "background", "reduceOptions": { "calcs": ["lastNotNull"] } }
+      },
+      {
+        "id": 4, "title": "Cert Expiry (days)", "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "targets": [{ "expr": "hospital_security_cert_days_until_expiry", "legendFormat": "Days" }],
+        "fieldConfig": { "defaults": { "unit": "d", "thresholds": { "steps": [{ "color": "red", "value": null }, { "color": "yellow", "value": 30 }, { "color": "green", "value": 90 }] } } },
+        "options": { "colorMode": "background", "reduceOptions": { "calcs": ["lastNotNull"] } }
+      },
+      {
+        "id": 5, "title": "Connections Over Time", "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "targets": [{ "expr": "hospital_db_active_connections", "legendFormat": "Active" }],
+        "fieldConfig": { "defaults": { "unit": "short" } }
+      },
+      {
+        "id": 6, "title": "Transaction Log Used %", "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "targets": [{ "expr": "hospital_db_transaction_log_used_percent", "legendFormat": "Log %" }],
+        "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 80 }] } } }
+      },
+      {
+        "id": 7, "title": "Long Running Queries (>5 min)", "type": "stat",
+        "gridPos": { "h": 4, "w": 8, "x": 0, "y": 12 },
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "targets": [{ "expr": "hospital_db_long_running_queries", "legendFormat": "Count" }],
+        "fieldConfig": { "defaults": { "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } } },
+        "options": { "colorMode": "background", "reduceOptions": { "calcs": ["lastNotNull"] } }
+      },
+      {
+        "id": 8, "title": "Disk Free Space Trend", "type": "timeseries",
+        "gridPos": { "h": 8, "w": 16, "x": 8, "y": 12 },
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "targets": [{ "expr": "node_filesystem_avail_bytes{mountpoint=\"/\"}", "legendFormat": "Free Space" }],
+        "fieldConfig": { "defaults": { "unit": "bytes" } }
+      },
+      {
+        "id": 9, "title": "SQL Server Error Log", "type": "logs",
+        "gridPos": { "h": 8, "w": 24, "x": 0, "y": 20 },
+        "datasource": { "type": "loki", "uid": "loki" },
+        "targets": [{ "expr": "{job=\"sqlserver\"} |~ \"(?i)error|fail|warning\"", "legendFormat": "" }],
+        "options": { "showTime": true, "showLabels": true, "wrapLogMessage": true, "sortOrder": "Descending", "enableLogDetails": true }
+      }
+    ]
+  },
+  "overwrite": true
+}

@@ -106,14 +106,28 @@ BEGIN
         PRINT CONCAT('Status: ', @Status);
         PRINT 'Daily backup verification completed successfully';
 
+        -- Telegram: success notification
+        IF OBJECT_ID('dbo.usp_SendTelegramAlert', 'P') IS NOT NULL
+            EXEC dbo.usp_SendTelegramAlert
+                @Severity = N'INFO',
+                @Title = N'Backup Verification Passed',
+                @Message = N'Daily backup verification completed. All backups verified.';
+
     END TRY
     BEGIN CATCH
         SET @ErrorMessage = ERROR_MESSAGE();
         PRINT CONCAT('ERROR: ', @ErrorMessage);
-        
+
         -- Log error
         INSERT INTO dbo.SystemConfiguration (ConfigKey, ConfigValue, ConfigCategory, Description, LastModifiedDate)
         VALUES ('BACKUP_VERIFY_ERROR', @ErrorMessage, 'Backup', 'Daily backup verification failed', GETDATE());
+
+        -- Telegram: failure alert
+        IF OBJECT_ID('dbo.usp_SendTelegramAlert', 'P') IS NOT NULL
+            EXEC dbo.usp_SendTelegramAlert
+                @Severity = N'CRITICAL',
+                @Title = N'Backup Verification FAILED',
+                @Message = @ErrorMessage;
 
         RAISERROR(@ErrorMessage, 16, 1);
     END CATCH;

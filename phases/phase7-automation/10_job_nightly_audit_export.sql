@@ -75,6 +75,13 @@ VALUES
      ''Nightly audit export to S3 completed successfully for '' +
      CONVERT(NVARCHAR(10), DATEADD(DAY, -1, GETUTCDATE()), 120));
 
+-- Telegram: success notification
+IF OBJECT_ID(''dbo.usp_SendTelegramAlert'', ''P'') IS NOT NULL
+    EXEC dbo.usp_SendTelegramAlert
+        @Severity = N''INFO'',
+        @Title = N''Audit Export Complete'',
+        @Message = N''Nightly audit log export to S3 completed successfully.'';
+
 PRINT ''Audit export verified and logged'';
 ',
     @on_success_action = 1, -- Quit with success

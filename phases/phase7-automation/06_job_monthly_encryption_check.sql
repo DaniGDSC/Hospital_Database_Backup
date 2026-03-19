@@ -174,6 +174,13 @@ BEGIN
             (BackupType, BackupStartDate, BackupFileName, BackupLocation, BackupStatus, VerificationStatus, VerificationDate)
             VALUES
             ('Full', GETDATE(), 'TDE & Certs', 'Local Disk', 'Completed', 'Verified', GETDATE());
+
+            -- Telegram: encryption check passed
+            IF OBJECT_ID('dbo.usp_SendTelegramAlert', 'P') IS NOT NULL
+                EXEC dbo.usp_SendTelegramAlert
+                    @Severity = N'INFO',
+                    @Title = N'Encryption Verified',
+                    @Message = N'Monthly encryption check passed. TDE active, certificates valid.';
         END
         ELSE
         BEGIN
@@ -182,16 +189,30 @@ BEGIN
             (BackupType, BackupStartDate, BackupFileName, BackupLocation, BackupStatus, VerificationStatus, VerificationDate)
             VALUES
             ('Full', GETDATE(), 'TDE & Certs', 'Local Disk', 'Completed', 'Failed', GETDATE());
+
+            -- Telegram: encryption issues found
+            IF OBJECT_ID('dbo.usp_SendTelegramAlert', 'P') IS NOT NULL
+                EXEC dbo.usp_SendTelegramAlert
+                    @Severity = N'CRITICAL',
+                    @Title = N'Encryption Check FAILED',
+                    @Message = N'Monthly encryption check found issues. Review SystemConfiguration table.';
         END
 
     END TRY
     BEGIN CATCH
         SET @ErrorMessage = ERROR_MESSAGE();
         PRINT CONCAT('ERROR: ', @ErrorMessage);
-        
-        INSERT INTO dbo.SystemConfiguration 
+
+        INSERT INTO dbo.SystemConfiguration
         (ConfigKey, ConfigValue, ConfigCategory, Description, LastModifiedDate)
         VALUES ('ENCRYPTION_CHECK_ERROR', @ErrorMessage, 'Security', 'Monthly encryption check failed', GETDATE());
+
+        -- Telegram: encryption check error
+        IF OBJECT_ID('dbo.usp_SendTelegramAlert', 'P') IS NOT NULL
+            EXEC dbo.usp_SendTelegramAlert
+                @Severity = N'CRITICAL',
+                @Title = N'Encryption Check ERROR',
+                @Message = @ErrorMessage;
 
         RAISERROR(@ErrorMessage, 16, 1);
     END CATCH;

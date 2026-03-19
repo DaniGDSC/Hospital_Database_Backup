@@ -108,5 +108,7 @@ if [ "$ACTUAL_COUNT" -ge 2 ] && [ $UPLOAD_FAILED -eq 0 ]; then
 else
     log ""
     log "✗ CRITICAL: Expected 2 files in S3 but found ${ACTUAL_COUNT}"
+    "${SCRIPT_DIR}/send_telegram.sh" "CRITICAL" "TDE Cert Backup Failed" \
+        "Certificate backup to S3 failed. Files in S3: ${ACTUAL_COUNT}. Manual action required." || true
     exit 1
 fi

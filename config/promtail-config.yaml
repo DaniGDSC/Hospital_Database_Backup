@@ -1,0 +1,115 @@
+# Promtail configuration for Hospital Database Backup
+# Ships 4 log types to Loki with PHI redaction
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+
+  # ─── Job 1: Security/Audit Logs (HIGHEST PRIORITY) ───
+  - job_name: security_audit
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: security_audit
+          environment: production
+          hospital: HospitalBackupDemo
+          sensitivity: high
+          __path__: /audit-export/audit_*.csv
+    pipeline_stages:
+      # PHI redaction — MUST run before any other processing
+      - replace:
+          expression: '\b\d{9,12}\b'                    # Vietnamese National ID
+          replace: '[PHI-REDACTED-ID]'
+      - replace:
+          expression: '\b0[0-9]{9,10}\b'                # Phone numbers
+          replace: '[PHI-REDACTED-PHONE]'
+      - replace:
+          expression: '\b[A-Z][a-z]+ [A-Z][a-z]+\b'    # Patient names (basic)
+          replace: '[PHI-REDACTED-NAME]'
+      - labels:
+          level: info
+
+  # ─── Job 2: SQL Server Error Logs ───
+  - job_name: sqlserver_errorlog
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: sqlserver
+          environment: production
+          __path__: /mssql-logs/errorlog*
+    pipeline_stages:
+      - multiline:
+          firstline: '^\d{4}-\d{2}-\d{2}'
+          max_wait_time: 3s
+      - regex:
+          expression: '^(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+)\s+(?P<source>\S+)\s+(?P<message>.*)'
+      - labels:
+          source:
+      - match:
+          selector: '{job="sqlserver"}'
+          stages:
+            - regex:
+                expression: '(?i)(error|fail|login failed|deadlock)'
+                source: message
+            - labels:
+                level:
+      # PHI redaction
+      - replace:
+          expression: '\b\d{9,12}\b'
+          replace: '[PHI-REDACTED-ID]'
+
+  # ─── Job 3: Bash Script Logs (automation) ───
+  - job_name: automation_logs
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: automation
+          environment: production
+          __path__: /app/logs/*.log
+    pipeline_stages:
+      - regex:
+          expression: '^\[(?P<timestamp>[^\]]+)\]\s+\[(?P<level>\w+)\]\s+(?P<message>.*)'
+      - labels:
+          level:
+      - timestamp:
+          source: timestamp
+          format: '2006-01-02 15:04:05'
+      # Mask any accidentally-logged passwords
+      - replace:
+          expression: '(?i)(password|secret|key)=\S+'
+          replace: '$1=[REDACTED]'
+      # PHI redaction
+      - replace:
+          expression: '\b\d{9,12}\b'
+          replace: '[PHI-REDACTED-ID]'
+
+  # ─── Job 4: Backup Logs ───
+  - job_name: backup_logs
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: backup
+          environment: production
+          __path__: /backup-logs/*.log
+    pipeline_stages:
+      - regex:
+          expression: '(?i)(?P<status>success|fail|error|completed|verified)'
+      - labels:
+          status:
+      - match:
+          selector: '{job="backup"} |~ "(?i)fail|error"'
+          stages:
+            - labels:
+                level: critical
+      # Mask credentials
+      - replace:
+          expression: '(?i)(password|secret|key)=\S+'
+          replace: '$1=[REDACTED]'

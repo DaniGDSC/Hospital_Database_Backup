@@ -1,0 +1,74 @@
+# Loki alerting rules for Hospital Database Backup
+# Place in Loki rules directory: /loki/rules/hospital/
+
+groups:
+  - name: hospital_security
+    interval: 1m
+    rules:
+
+      # Alert 1: Failed Login Burst (brute force detection)
+      - alert: FailedLoginBurst
+        expr: |
+          sum(count_over_time({job="sqlserver"} |~ "(?i)login failed" [5m])) > 5
+        for: 0m
+        labels:
+          severity: critical
+          category: security_breach_attempt
+        annotations:
+          summary: "More than 5 failed logins in 5 minutes"
+          description: "Possible brute force attack on SQL Server"
+
+      # Alert 5: Unusual PHI Access Spike
+      - alert: UnusualPHIAccess
+        expr: |
+          sum(count_over_time({job="security_audit"} |~ "MedicalRecords" [1h])) > 100
+        for: 0m
+        labels:
+          severity: high
+          category: unusual_phi_access
+        annotations:
+          summary: "MedicalRecords accessed > 100 times in 1 hour"
+          description: "Unusual PHI access pattern detected — investigate"
+
+  - name: hospital_backup
+    interval: 1m
+    rules:
+
+      # Alert 2: Backup Failure
+      - alert: BackupFailure
+        expr: |
+          count_over_time({job="backup"} |~ "(?i)fail|error" [15m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          category: backup_failure
+        annotations:
+          summary: "Backup failure detected"
+          description: "A backup job reported failure — immediate review required"
+
+      # Alert 3: SQL Server High Severity Error
+      - alert: SQLServerCriticalError
+        expr: |
+          count_over_time({job="sqlserver"} |~ "(?i)error.*severity.*1[6-9]|severity.*2[0-5]" [5m]) > 0
+        for: 0m
+        labels:
+          severity: high
+          category: database_error
+        annotations:
+          summary: "SQL Server high-severity error detected"
+
+  - name: hospital_pipeline
+    interval: 5m
+    rules:
+
+      # Alert 4: Log Pipeline Gap Detection
+      - alert: LogPipelineGap
+        expr: |
+          count_over_time({job=~"security_audit|sqlserver|automation|backup"}[30m]) == 0
+        for: 30m
+        labels:
+          severity: high
+          category: log_pipeline_failure
+        annotations:
+          summary: "No logs received from {{ $labels.job }} in 30 minutes"
+          description: "Log shipping pipeline may be broken — check Promtail"

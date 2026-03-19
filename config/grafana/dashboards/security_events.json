@@ -1,0 +1,81 @@
+{
+  "dashboard": {
+    "title": "Security Monitor",
+    "uid": "hospital-security-monitor",
+    "tags": ["hospital", "security", "hipaa"],
+    "timezone": "browser",
+    "refresh": "30s",
+    "time": { "from": "now-1h", "to": "now" },
+    "panels": [
+      {
+        "id": 1, "title": "Failed Logins (last hour)", "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "targets": [{ "expr": "hospital_security_failed_logins_per_hour", "legendFormat": "Failed" }],
+        "fieldConfig": { "defaults": { "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 5 }, { "color": "red", "value": 20 }] } } },
+        "options": { "colorMode": "background", "reduceOptions": { "calcs": ["lastNotNull"] } }
+      },
+      {
+        "id": 2, "title": "RBAC Violations", "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+        "datasource": { "type": "loki", "uid": "loki" },
+        "targets": [{ "expr": "count_over_time({job=\"security_audit\"} |~ \"BLOCKED|DENIED\" [1h])", "legendFormat": "Violations" }],
+        "fieldConfig": { "defaults": { "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } } },
+        "options": { "colorMode": "background", "reduceOptions": { "calcs": ["lastNotNull"] } }
+      },
+      {
+        "id": 3, "title": "Audit Pipeline", "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+        "datasource": { "type": "loki", "uid": "loki" },
+        "targets": [{ "expr": "count_over_time({job=\"security_audit\"}[1h])", "legendFormat": "Entries" }],
+        "fieldConfig": { "defaults": { "thresholds": { "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] } } },
+        "options": { "colorMode": "background", "reduceOptions": { "calcs": ["lastNotNull"] } }
+      },
+      {
+        "id": 4, "title": "PHI Access (last hour)", "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+        "datasource": { "type": "loki", "uid": "loki" },
+        "targets": [{ "expr": "count_over_time({job=\"security_audit\"} |~ \"MedicalRecords|Patients\" [1h])", "legendFormat": "PHI Events" }],
+        "fieldConfig": { "defaults": { "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 50 }, { "color": "red", "value": 100 }] } } },
+        "options": { "colorMode": "background", "reduceOptions": { "calcs": ["lastNotNull"] } }
+      },
+      {
+        "id": 5, "title": "Failed Logins Over Time", "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "targets": [{ "expr": "hospital_security_failed_logins_per_hour", "legendFormat": "Failed/hour" }],
+        "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 5 }] } } }
+      },
+      {
+        "id": 6, "title": "Failed Logins by Source", "type": "barchart",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+        "datasource": { "type": "loki", "uid": "loki" },
+        "targets": [{ "expr": "sum by (source) (count_over_time({job=\"sqlserver\"} |~ \"Login failed\" [1h]))", "legendFormat": "{{ source }}" }]
+      },
+      {
+        "id": 7, "title": "Recent Security Events", "type": "logs",
+        "gridPos": { "h": 8, "w": 24, "x": 0, "y": 12 },
+        "datasource": { "type": "loki", "uid": "loki" },
+        "targets": [{ "expr": "{job=\"security_audit\"}", "legendFormat": "" }],
+        "options": { "showTime": true, "showLabels": true, "wrapLogMessage": true, "sortOrder": "Descending", "enableLogDetails": true }
+      },
+      {
+        "id": 9, "title": "Backup Verification Rate (30d)", "type": "stat",
+        "gridPos": { "h": 4, "w": 12, "x": 0, "y": 20 },
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "targets": [{ "expr": "hospital_backup_verification_status", "legendFormat": "Rate" }],
+        "fieldConfig": { "defaults": { "mappings": [{ "type": "value", "options": { "1": { "text": "100% PASS", "color": "green" }, "0": { "text": "FAILURES DETECTED", "color": "red" } } }] } },
+        "options": { "colorMode": "background", "reduceOptions": { "calcs": ["lastNotNull"] } }
+      },
+      {
+        "id": 10, "title": "TDE Encryption Status", "type": "stat",
+        "gridPos": { "h": 4, "w": 12, "x": 12, "y": 20 },
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "targets": [{ "expr": "hospital_security_tde_status", "legendFormat": "TDE" }],
+        "fieldConfig": { "defaults": { "mappings": [{ "type": "value", "options": { "1": { "text": "ENCRYPTED", "color": "green" }, "0": { "text": "NOT ENCRYPTED", "color": "red" } } }] } },
+        "options": { "colorMode": "background", "reduceOptions": { "calcs": ["lastNotNull"] } }
+      }
+    ]
+  },
+  "overwrite": true
+}

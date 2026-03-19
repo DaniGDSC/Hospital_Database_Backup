@@ -174,6 +174,8 @@ run_phase() {
     # Execute the phase
     if ! "${RUNNER}" "${phase}" >> "${LOG_FILE}" 2>&1; then
         log_error "Phase ${phase} execution failed"
+        "${SCRIPT_DIR}/utilities/send_telegram.sh" "CRITICAL" \
+            "Phase ${phase} FAILED" "Phase ${PHASE_TITLES[$phase]} execution failed" || true
         return 1
     fi
 

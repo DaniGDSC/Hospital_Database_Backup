@@ -193,14 +193,28 @@ BEGIN
         PRINT CONCAT('Test database created: ', @TestDB);
         PRINT CONCAT('Keep for review, will be auto-deleted after 7 days');
 
+        -- Telegram: DR drill success
+        IF OBJECT_ID('dbo.usp_SendTelegramAlert', 'P') IS NOT NULL
+            EXEC dbo.usp_SendTelegramAlert
+                @Severity = N'INFO',
+                @Title = N'DR Drill Completed',
+                @Message = N'Weekly recovery drill passed. Test DB created and verified.';
+
     END TRY
     BEGIN CATCH
         SET @ErrorMessage = ERROR_MESSAGE();
         PRINT CONCAT('ERROR: ', @ErrorMessage);
-        
+
         -- Log failure
         INSERT INTO dbo.SystemConfiguration (ConfigKey, ConfigValue, ConfigCategory, Description, LastModifiedDate)
         VALUES ('RECOVERY_DRILL_ERROR', @ErrorMessage, 'Backup', 'Weekly recovery drill failed', GETDATE());
+
+        -- Telegram: DR drill failure
+        IF OBJECT_ID('dbo.usp_SendTelegramAlert', 'P') IS NOT NULL
+            EXEC dbo.usp_SendTelegramAlert
+                @Severity = N'CRITICAL',
+                @Title = N'DR Drill FAILED',
+                @Message = @ErrorMessage;
 
         RAISERROR(@ErrorMessage, 16, 1);
     END CATCH;

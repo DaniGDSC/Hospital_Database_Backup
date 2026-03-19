@@ -138,6 +138,14 @@ BEGIN
              'BACKUP VERIFICATION FAILED: ' + @TypeLabel + ' backup at ' + @FileName);
 
         PRINT '✗ VERIFICATION FAILED: ' + @VerifyError;
+
+        -- Send Telegram alert for backup verification failure
+        IF OBJECT_ID('dbo.usp_SendTelegramAlert', 'P') IS NOT NULL
+            EXEC dbo.usp_SendTelegramAlert
+                @Severity = N'CRITICAL',
+                @Title = N'Backup Verification FAILED',
+                @Message = @VerifyError;
+
         RAISERROR('Backup verification failed for %s: %s', 16, 1, @FileName, @VerifyError);
     END CATCH;
 END

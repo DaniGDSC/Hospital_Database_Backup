@@ -1,0 +1,73 @@
+{
+  "dashboard": {
+    "title": "Hospital Backup Health",
+    "uid": "hospital-backup-health",
+    "tags": ["hospital", "backup", "hipaa"],
+    "timezone": "browser",
+    "refresh": "30s",
+    "time": { "from": "now-24h", "to": "now" },
+    "panels": [
+      {
+        "id": 1, "title": "Last Full Backup", "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "targets": [{ "expr": "time() - hospital_backup_last_success_timestamp{type=\"full\"}", "legendFormat": "Hours ago" }],
+        "fieldConfig": { "defaults": { "unit": "s", "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 604800 }] } } },
+        "options": { "colorMode": "background", "reduceOptions": { "calcs": ["lastNotNull"] } }
+      },
+      {
+        "id": 2, "title": "Last Diff Backup", "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "targets": [{ "expr": "time() - hospital_backup_last_success_timestamp{type=\"differential\"}", "legendFormat": "Hours ago" }],
+        "fieldConfig": { "defaults": { "unit": "s", "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 86400 }] } } },
+        "options": { "colorMode": "background", "reduceOptions": { "calcs": ["lastNotNull"] } }
+      },
+      {
+        "id": 3, "title": "Last Log Backup (RPO)", "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "targets": [{ "expr": "time() - hospital_backup_last_success_timestamp{type=\"log\"}", "legendFormat": "Minutes ago" }],
+        "fieldConfig": { "defaults": { "unit": "s", "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 2700 }, { "color": "red", "value": 3600 }] } } },
+        "options": { "colorMode": "background", "reduceOptions": { "calcs": ["lastNotNull"] } }
+      },
+      {
+        "id": 4, "title": "Backup Verification", "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "targets": [{ "expr": "hospital_backup_verification_status", "legendFormat": "Status" }],
+        "fieldConfig": { "defaults": { "mappings": [{ "type": "value", "options": { "1": { "text": "PASS", "color": "green" }, "0": { "text": "FAIL", "color": "red" } } }] } },
+        "options": { "colorMode": "background", "reduceOptions": { "calcs": ["lastNotNull"] } }
+      },
+      {
+        "id": 5, "title": "Backup Size (30 days)", "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "targets": [{ "expr": "hospital_backup_size_bytes{type=\"full\"}", "legendFormat": "Full Backup" }],
+        "fieldConfig": { "defaults": { "unit": "bytes" } }
+      },
+      {
+        "id": 6, "title": "Backup Duration", "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "targets": [{ "expr": "hospital_backup_duration_seconds{type=\"full\"}", "legendFormat": "Full Duration" }],
+        "fieldConfig": { "defaults": { "unit": "s", "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 3600 }] } } }
+      },
+      {
+        "id": 7, "title": "Disk Usage", "type": "gauge",
+        "gridPos": { "h": 6, "w": 12, "x": 0, "y": 12 },
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "targets": [{ "expr": "100 - (node_filesystem_avail_bytes{mountpoint=\"/\"} / node_filesystem_size_bytes{mountpoint=\"/\"} * 100)", "legendFormat": "Disk Used %" }],
+        "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 60 }, { "color": "red", "value": 80 }] } } }
+      },
+      {
+        "id": 9, "title": "Recent Backup Events", "type": "logs",
+        "gridPos": { "h": 8, "w": 24, "x": 0, "y": 18 },
+        "datasource": { "type": "loki", "uid": "loki" },
+        "targets": [{ "expr": "{job=\"backup\"}", "legendFormat": "" }],
+        "options": { "showTime": true, "showLabels": true, "showCommonLabels": false, "wrapLogMessage": true, "sortOrder": "Descending", "dedupStrategy": "none", "enableLogDetails": true }
+      }
+    ]
+  },
+  "overwrite": true
+}
