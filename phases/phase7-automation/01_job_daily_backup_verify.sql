@@ -7,19 +7,18 @@ USE msdb;
 GO
 
 -- Step 1: Create the stored procedure (run in HospitalBackupDemo)
-PRINT 'Creating stored procedure sp_verify_last_backup...';
+PRINT 'Creating stored procedure usp_VerifyLastBackup...';
 GO
 
 -- Switch to target database for procedure creation
 USE HospitalBackupDemo;
 GO
 
-IF EXISTS (SELECT 1 FROM sys.procedures WHERE name = 'sp_verify_last_backup')
-    DROP PROCEDURE sp_verify_last_backup;
+IF EXISTS (SELECT 1 FROM sys.procedures WHERE name = 'usp_VerifyLastBackup')
+    DROP PROCEDURE usp_VerifyLastBackup;
 GO
 
-CREATE PROCEDURE sp_verify_last_backup
-    @NotifyEmail NVARCHAR(MAX) = 'dba@hospital.local'
+CREATE PROCEDURE usp_VerifyLastBackup
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -99,10 +98,10 @@ BEGIN
         END
 
         -- Log result to BackupHistory
-        INSERT INTO dbo.BackupHistory 
-        (BackupType, BackupDate, BackupSize, BackupFile, VerificationStatus, VerificationDate)
-        VALUES 
-        ('FULL_VERIFY', GETDATE(), @BackupSize, @BackupFile, @Status, GETDATE());
+        INSERT INTO dbo.BackupHistory
+        (BackupType, BackupStartDate, BackupFileSize, BackupFileName, BackupLocation, BackupStatus, VerificationStatus, VerificationDate)
+        VALUES
+        ('Full', GETDATE(), @BackupSize, @BackupFile, @BackupFile, 'Completed', @Status, GETDATE());
 
         PRINT CONCAT('Status: ', @Status);
         PRINT 'Daily backup verification completed successfully';
@@ -113,15 +112,15 @@ BEGIN
         PRINT CONCAT('ERROR: ', @ErrorMessage);
         
         -- Log error
-        INSERT INTO dbo.SystemConfiguration (ConfigKey, ConfigValue, ConfigDescription, LastUpdated)
-        VALUES ('BACKUP_VERIFY_ERROR', @ErrorMessage, 'Daily backup verification failed', GETDATE());
+        INSERT INTO dbo.SystemConfiguration (ConfigKey, ConfigValue, ConfigCategory, Description, LastModifiedDate)
+        VALUES ('BACKUP_VERIFY_ERROR', @ErrorMessage, 'Backup', 'Daily backup verification failed', GETDATE());
 
         RAISERROR(@ErrorMessage, 16, 1);
     END CATCH;
 END;
 GO
 
-PRINT 'Stored procedure sp_verify_last_backup created successfully';
+PRINT 'Stored procedure usp_VerifyLastBackup created successfully';
 GO
 
 -- Step 2: Create the SQL Agent Job (run in msdb)
@@ -148,7 +147,7 @@ EXEC sp_add_jobstep
     @step_name = N'Verify_Backup',
     @subsystem = N'TSQL',
     @database_name = N'HospitalBackupDemo',
-    @command = N'EXEC sp_verify_last_backup @NotifyEmail = ''dba@hospital.local'';',
+    @command = N'EXEC usp_VerifyLastBackup;',
     @retry_attempts = 2,
     @retry_interval = 5,
     @on_success_action = 1,

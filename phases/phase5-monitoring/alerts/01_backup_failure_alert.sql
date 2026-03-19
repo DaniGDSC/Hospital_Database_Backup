@@ -1,11 +1,48 @@
 -- Enhanced alert: detect failed backups, check backup age, RPO, and RTO violations
+-- Creates shared procedure usp_GetBackupTimestamps used by all alert scripts
+USE HospitalBackupDemo;
+GO
+
+SET NOCOUNT ON;
+
+-- Create/update the shared backup timestamp procedure
+IF OBJECT_ID('dbo.usp_GetBackupTimestamps', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.usp_GetBackupTimestamps;
+GO
+
+CREATE PROCEDURE dbo.usp_GetBackupTimestamps
+    @LastFull DATETIME OUTPUT,
+    @LastDiff DATETIME OUTPUT,
+    @LastLog  DATETIME OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT @LastFull = MAX(backup_finish_date)
+    FROM msdb.dbo.backupset
+    WHERE database_name = 'HospitalBackupDemo' AND type = 'D';
+
+    SELECT @LastDiff = MAX(backup_finish_date)
+    FROM msdb.dbo.backupset
+    WHERE database_name = 'HospitalBackupDemo' AND type = 'I';
+
+    SELECT @LastLog = MAX(backup_finish_date)
+    FROM msdb.dbo.backupset
+    WHERE database_name = 'HospitalBackupDemo' AND type = 'L';
+END
+GO
+
+PRINT '✓ Shared procedure usp_GetBackupTimestamps created';
+GO
+
+-- Run the backup failure alert checks
 USE msdb;
 GO
 
 SET NOCOUNT ON;
 
 PRINT '=== Enhanced Backup & Recovery Alerts for HospitalBackupDemo ===';
-PRINT ''; 
+PRINT '';
 
 -- Display recent backup history
 SELECT TOP 20
@@ -28,17 +65,18 @@ PRINT '';
 PRINT '--- ALERT THRESHOLD CHECKS ---';
 PRINT '';
 
--- Check 1: Full backup age (target: max 1 day, alert: > 2 days)
 DECLARE @lastFull DATETIME;
 DECLARE @lastLog DATETIME;
 DECLARE @lastDiff DATETIME;
 DECLARE @alertMessage NVARCHAR(MAX) = '';
 DECLARE @alertCount INT = 0;
 
-SELECT @lastFull = MAX(backup_finish_date) FROM msdb.dbo.backupset WHERE database_name = 'HospitalBackupDemo' AND type = 'D';
-SELECT @lastLog = MAX(backup_finish_date) FROM msdb.dbo.backupset WHERE database_name = 'HospitalBackupDemo' AND type = 'L';
-SELECT @lastDiff = MAX(backup_finish_date) FROM msdb.dbo.backupset WHERE database_name = 'HospitalBackupDemo' AND type = 'I';
+EXEC HospitalBackupDemo.dbo.usp_GetBackupTimestamps
+    @LastFull = @lastFull OUTPUT,
+    @LastDiff = @lastDiff OUTPUT,
+    @LastLog  = @lastLog OUTPUT;
 
+-- Check 1: Full backup age (target: max 1 day, alert: > 2 days)
 IF @lastFull IS NULL OR @lastFull < DATEADD(DAY, -2, GETDATE())
 BEGIN
     SET @alertMessage = 'CRITICAL: Full backup is older than 2 days or missing (Last: ' + ISNULL(CONVERT(NVARCHAR(30), @lastFull, 126), 'NONE') + ')';

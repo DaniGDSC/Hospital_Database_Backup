@@ -6,12 +6,6 @@ PROJECT_ROOT="$( cd "$SCRIPT_DIR/../.." && pwd )"
 # Load configuration from helpers
 source "${PROJECT_ROOT}/scripts/helpers/load_config.sh"
 
-# Colors
-GREEN='\033[0;32m'
-RED='\033[0;31m'
-CYAN='\033[0;36m'
-NC='\033[0m'
-
 if [ -z "$1" ]; then
     echo "Usage: $0 <phase_number>"
     echo "Example: $0 1  (runs phases/phase1-database)"

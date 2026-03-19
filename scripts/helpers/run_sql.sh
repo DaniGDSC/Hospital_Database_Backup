@@ -5,13 +5,6 @@
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "${SCRIPT_DIR}/load_config.sh"
 
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-CYAN='\033[0;36m'
-NC='\033[0m'
-
 # Check arguments
 if [ -z "$1" ]; then
     echo -e "${RED}Error: No SQL script specified${NC}"
@@ -41,27 +34,19 @@ echo "Database : $DB_NAME"
 echo "Log      : $LOG_FILE"
 echo ""
 
-# Build connection string with explicit port handling
-SERVER_CONN="${SQL_SERVER}"
-if [[ ! "$SERVER_CONN" =~ , ]]; then
-    SERVER_CONN="${SQL_SERVER},${SQL_PORT}"
-fi
-
-# Run SQL
-# Build optional sqlcmd variable args
+# Build optional sqlcmd variable args (env var → sqlcmd variable name)
+declare -A SQLCMD_VARS=(
+    [S3_BUCKET_NAME]="S3_BUCKET_NAME"
+    [S3_REGION]="S3_REGION"
+    [S3_ACCESS_KEY_ID]="S3_IDENTITY"
+    [S3_SECRET_ACCESS_KEY]="S3_SECRET"
+)
 VAR_ARGS=()
-if [ -n "${S3_BUCKET_NAME:-}" ]; then
-    VAR_ARGS+=("-v" "S3_BUCKET_NAME=${S3_BUCKET_NAME}")
-fi
-if [ -n "${S3_REGION:-}" ]; then
-    VAR_ARGS+=("-v" "S3_REGION=${S3_REGION}")
-fi
-if [ -n "${S3_ACCESS_KEY_ID:-}" ]; then
-    VAR_ARGS+=("-v" "S3_IDENTITY=${S3_ACCESS_KEY_ID}")
-fi
-if [ -n "${S3_SECRET_ACCESS_KEY:-}" ]; then
-    VAR_ARGS+=("-v" "S3_SECRET=${S3_SECRET_ACCESS_KEY}")
-fi
+for env_var in "${!SQLCMD_VARS[@]}"; do
+    if [ -n "${!env_var:-}" ]; then
+        VAR_ARGS+=("-v" "${SQLCMD_VARS[$env_var]}=${!env_var}")
+    fi
+done
 
 sqlcmd -S "$SERVER_CONN" -U "$SQL_USER" -P "$SQL_PASSWORD" -d "$DB_NAME" \
         -C -i "$SQL_FILE" -o "$LOG_FILE" "${VAR_ARGS[@]}" 2>&1

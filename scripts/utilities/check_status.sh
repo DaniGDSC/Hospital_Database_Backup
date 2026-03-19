@@ -18,7 +18,7 @@ fi
 # Check database
 echo ""
 echo "2. Database Status:"
-sqlcmd -S "$SQL_SERVER" -U "$SQL_USER" -P "$SQL_PASSWORD" -C -Q "
+sqlcmd -S "$SERVER_CONN" -U "$SQL_USER" -P "$SQL_PASSWORD" -C -Q "
 IF EXISTS (SELECT name FROM sys.databases WHERE name = '$DATABASE_NAME')
     SELECT '   ✓ Database exists: $DATABASE_NAME' AS Status
 ELSE
@@ -33,11 +33,12 @@ ls -lt /var/opt/mssql/backup/full/*.bak 2>/dev/null | head -3 || echo "   No bac
 # Check logs
 echo ""
 echo "4. Recent Logs:"
-ls -lt logs/ 2>/dev/null | head -5 || echo "   No logs found"
+ls -lt "${PROJECT_ROOT}/logs/" 2>/dev/null | head -5 || echo "   No logs found"
 
 # Check certificates
 echo ""
 echo "5. Certificate Backups:"
-ls -l certificates-backup/ 2>/dev/null | grep -E '\.(cer|pvk)$' | wc -l | xargs echo "   Certificates:"
+CERT_COUNT=$(ls -l "${PROJECT_ROOT}/certificates-backup/" 2>/dev/null | grep -cE '\.(cer|pvk)$' || echo "0")
+echo "   Certificates: ${CERT_COUNT}"
 
 echo ""

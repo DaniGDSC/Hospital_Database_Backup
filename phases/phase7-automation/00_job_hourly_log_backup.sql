@@ -10,7 +10,7 @@ IF EXISTS (SELECT 1 FROM sysjobs WHERE name = N'HospitalBackup_Hourly_LogBackup'
     EXEC sp_delete_job @job_name = N'HospitalBackup_Hourly_LogBackup', @delete_unused_schedule = 1;
 GO
 
-EXEC sp_add_job 
+EXEC sp_add_job
     @job_name = N'HospitalBackup_Hourly_LogBackup',
     @enabled = 1,
     @description = N'Hourly encrypted log backup to local disk',
@@ -18,13 +18,13 @@ EXEC sp_add_job
     @category_name = N'Database Maintenance';
 GO
 
--- Step: Local encrypted log backup
+-- Step: Local encrypted log backup via shared procedure
 EXEC sp_add_jobstep
     @job_name = N'HospitalBackup_Hourly_LogBackup',
     @step_name = N'Log_Backup_Local',
     @subsystem = N'TSQL',
-    @database_name = N'master',
-    @command = N':r /home/un1/hospital-db-backup-project/phases/phase3-backup/log/01_log_backup.sql',
+    @database_name = N'HospitalBackupDemo',
+    @command = N'EXEC dbo.usp_PerformBackup @BackupType = N''LOG'';',
     @retry_attempts = 2,
     @retry_interval = 5,
     @on_success_action = 1, -- Quit with success

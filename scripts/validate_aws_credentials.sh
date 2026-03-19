@@ -5,20 +5,16 @@
 set -e
 
 PROJECT_ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
+source "${PROJECT_ROOT}/scripts/helpers/load_config.sh"
 CONFIG_FILE="$PROJECT_ROOT/config/project.conf"
-
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
 
 PASSED=0
 FAILED=0
 WARNINGS=0
 
 # Helper functions
+mask_key() { echo "${1:0:4}...${1: -4}"; }
+
 pass() {
     echo -e "${GREEN}✓${NC} $1"
     ((PASSED++))
@@ -67,8 +63,7 @@ fi
 echo ""
 echo -e "${BLUE}[3/8] Checking Environment Credentials${NC}"
 if [ -n "$S3_ACCESS_KEY_ID" ]; then
-    MASKED="${S3_ACCESS_KEY_ID:0:4}...${S3_ACCESS_KEY_ID: -4}"
-    pass "S3_ACCESS_KEY_ID set (${MASKED})"
+    pass "S3_ACCESS_KEY_ID set ($(mask_key "$S3_ACCESS_KEY_ID"))"
 else
     warn "S3_ACCESS_KEY_ID not set in environment"
 fi
@@ -84,8 +79,7 @@ echo ""
 echo -e "${BLUE}[4/8] Checking Config File Credentials${NC}"
 if grep -q 'S3_ACCESS_KEY_ID="AKIA' "$CONFIG_FILE" 2>/dev/null; then
     KEY=$(grep 'S3_ACCESS_KEY_ID=' "$CONFIG_FILE" | cut -d'"' -f2)
-    MASKED="${KEY:0:4}...${KEY: -4}"
-    pass "Credentials in config file (${MASKED})"
+    pass "Credentials in config file ($(mask_key "$KEY"))"
 elif grep -q 'S3_ACCESS_KEY_ID=""' "$CONFIG_FILE" 2>/dev/null; then
     info "Config file has empty credentials (using environment or ~/.aws/)"
 else

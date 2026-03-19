@@ -1,4 +1,6 @@
 -- Create certificates used for TDE and column encryption
+-- CRITICAL: This script also backs up the TDE certificate.
+-- Without the backup, encrypted data is UNRECOVERABLE if the server is lost.
 USE master;
 GO
 
@@ -17,14 +19,30 @@ ELSE
     PRINT 'TDE certificate already exists.';
 GO
 
-PRINT '=== (Optional) Backup TDE certificate and private key ===';
--- Adjust backup path and password for your environment
--- BACKUP CERTIFICATE HospitalBackupDemo_TDECert
---   TO FILE = '/var/opt/mssql/backup/certificates/HospitalBackupDemo_TDECert.cer'
---   WITH PRIVATE KEY (
---       FILE = '/var/opt/mssql/backup/certificates/HospitalBackupDemo_TDECert.pvk',
---       ENCRYPTION BY PASSWORD = 'Str0ng#CertBackup!2025'
---   );
+-- Back up TDE certificate and private key
+-- Password sourced via sqlcmd variable: sqlcmd -v CERT_BACKUP_PASSWORD="..."
+PRINT '=== Backing up TDE certificate and private key ===';
+
+DECLARE @CertFile NVARCHAR(260) = '/var/opt/mssql/backup/certificates/HospitalBackupDemo_TDECert.cer';
+DECLARE @KeyFile  NVARCHAR(260) = '/var/opt/mssql/backup/certificates/HospitalBackupDemo_TDECert.pvk';
+DECLARE @Password NVARCHAR(128) = '$(CERT_BACKUP_PASSWORD)';
+
+-- Validate password was provided (not the literal placeholder)
+IF @Password = '$(CERT_BACKUP_PASSWORD)' OR LEN(@Password) < 12
+BEGIN
+    RAISERROR('CERT_BACKUP_PASSWORD must be provided via sqlcmd -v and be at least 12 characters.', 16, 1);
+    RETURN;
+END
+
+BACKUP CERTIFICATE HospitalBackupDemo_TDECert
+    TO FILE = @CertFile
+    WITH PRIVATE KEY (
+        FILE = @KeyFile,
+        ENCRYPTION BY PASSWORD = @Password
+    );
+
+PRINT '✓ TDE certificate backed up to: ' + @CertFile;
+PRINT '✓ Private key backed up to:     ' + @KeyFile;
 GO
 
 USE HospitalBackupDemo;

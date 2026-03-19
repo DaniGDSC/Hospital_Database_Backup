@@ -21,12 +21,9 @@ PHASES_DIR="${PROJECT_ROOT}/phases"
 LOGS_DIR="${PROJECT_ROOT}/logs"
 RUNNER="${SCRIPT_DIR}/runners/run_phase.sh"
 
-# SQL Server Configuration (from config/project.conf)
-SQL_HOST="${SQL_HOST:-127.0.0.1}"
-SQL_PORT="${SQL_PORT:-14333}"
-SQL_USER="${SQL_USER:-SA}"
-SQL_PASSWORD="${SQL_PASSWORD:-Daniel@2410}"
-DB_NAME="HospitalBackupDemo"
+# Load SQL Server configuration from central config
+source "${SCRIPT_DIR}/helpers/load_config.sh"
+DB_NAME="${DATABASE_NAME}"
 
 # Logging
 LOG_FILE="${LOGS_DIR}/pipeline_$(date +%Y%m%d_%H%M%S).log"
@@ -68,10 +65,14 @@ log_warning() {
 }
 
 print_header() {
+    local title="$1"
+    local width=64
+    local padded
+    padded=$(printf "%-${width}s" " ${title}")
     echo ""
-    echo "╔════════════════════════════════════════════════════════════════╗"
-    echo "║ $1" 
-    echo "╚════════════════════════════════════════════════════════════════╝"
+    echo "╔$(printf '═%.0s' $(seq 1 $width))╗"
+    echo "║${padded}║"
+    echo "╚$(printf '═%.0s' $(seq 1 $width))╝"
     echo ""
 }
 
@@ -88,21 +89,21 @@ print_phase_header() {
 
 test_sql_connection() {
     log_info "Testing SQL Server connection..."
-    
-    if ! sqlcmd -S "${SQL_HOST},${SQL_PORT}" -U "${SQL_USER}" -P "${SQL_PASSWORD}" \
+
+    if ! sqlcmd -S "${SERVER_CONN}" -U "${SQL_USER}" -P "${SQL_PASSWORD}" \
         -Q "SELECT 1" &>/dev/null; then
-        log_error "Failed to connect to SQL Server at ${SQL_HOST}:${SQL_PORT}"
+        log_error "Failed to connect to SQL Server at ${SERVER_CONN}"
         return 1
     fi
-    
+
     log_success "SQL Server connection verified"
     return 0
 }
 
 check_database_exists() {
     local db_name=$1
-    
-    if sqlcmd -S "${SQL_HOST},${SQL_PORT}" -U "${SQL_USER}" -P "${SQL_PASSWORD}" \
+
+    if sqlcmd -S "${SERVER_CONN}" -U "${SQL_USER}" -P "${SQL_PASSWORD}" \
         -Q "SELECT 1 FROM sys.databases WHERE name = '${db_name}'" 2>/dev/null | grep -q "1"; then
         return 0
     fi
@@ -132,73 +133,68 @@ wait_for_database() {
     return 1
 }
 
+# Phase metadata: title and description
+declare -A PHASE_TITLES=(
+    [1]="Database Development"
+    [2]="Security Implementation"
+    [3]="Backup Configuration"
+    [4]="Disaster Recovery"
+    [5]="Monitoring & Alerting"
+    [6]="Testing & Validation"
+    [7]="Automation & Jobs"
+)
+
+declare -A PHASE_DESCRIPTIONS=(
+    [1]="Creating hospital database with 18 tables and sample data..."
+    [2]="Implementing TDE, encryption, RBAC, and audit logging..."
+    [3]="Setting up 3-2-1 backup strategy with local and S3 storage..."
+    [4]="Implementing multiple recovery methods and validation..."
+    [5]="Setting up health checks, alerts, and monitoring reports..."
+    [6]="Creating test framework and executing comprehensive tests..."
+    [7]="Deploying SQL Agent jobs for automated backup and monitoring..."
+)
+
+run_sql_query() {
+    sqlcmd -S "${SERVER_CONN}" -U "${SQL_USER}" -P "${SQL_PASSWORD}" \
+        -d "${1}" -h -1 -Q "${2}" 2>/dev/null | tr -d ' '
+}
+
 run_phase() {
     local phase=$1
-    
-    case $phase in
-        1)
-            print_phase_header 1 "Database Development"
-            log_info "Creating hospital database with 18 tables and sample data..."
-            ;;
-        2)
-            print_phase_header 2 "Security Implementation"
-            log_info "Implementing TDE, encryption, RBAC, and audit logging..."
-            
-            # Verify Phase 1 completed
-            if ! check_database_exists "${DB_NAME}"; then
-                log_error "Phase 1 must be completed first (database does not exist)"
-                return 1
-            fi
-            ;;
-        3)
-            print_phase_header 3 "Backup Configuration"
-            log_info "Setting up 3-2-1 backup strategy with local and S3 storage..."
-            ;;
-        4)
-            print_phase_header 4 "Disaster Recovery"
-            log_info "Implementing multiple recovery methods and validation..."
-            ;;
-        5)
-            print_phase_header 5 "Monitoring & Alerting"
-            log_info "Setting up health checks, alerts, and monitoring reports..."
-            ;;
-        6)
-            print_phase_header 6 "Testing & Validation"
-            log_info "Creating test framework and executing comprehensive tests..."
-            ;;
-        7)
-            print_phase_header 7 "Automation & Jobs"
-            log_info "Deploying SQL Agent jobs for automated backup and monitoring..."
-            ;;
-    esac
-    
+
+    print_phase_header "${phase}" "${PHASE_TITLES[$phase]}"
+    log_info "${PHASE_DESCRIPTIONS[$phase]}"
+
+    # Phase-specific preconditions
+    if [ "${phase}" -eq 2 ] && ! check_database_exists "${DB_NAME}"; then
+        log_error "Phase 1 must be completed first (database does not exist)"
+        return 1
+    fi
+
     # Execute the phase
     if ! "${RUNNER}" "${phase}" >> "${LOG_FILE}" 2>&1; then
         log_error "Phase ${phase} execution failed"
         return 1
     fi
-    
+
     log_success "Phase ${phase} completed successfully"
-    
+
     # Post-phase validation
     validate_phase "${phase}" || return 1
-    
+
     return 0
 }
 
 validate_phase() {
     local phase=$1
-    
+
     case $phase in
         1)
             log_info "Validating Phase 1: Checking database structure..."
-            local table_count=$(sqlcmd -S "${SQL_HOST},${SQL_PORT}" -U "${SQL_USER}" \
-                -P "${SQL_PASSWORD}" -d master -h -1 \
-                -Q "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'dbo' AND TABLE_CATALOG = '${DB_NAME}' AND TABLE_TYPE = 'BASE TABLE'" 2>/dev/null | tr -d ' ')
-            
+            local table_count
+            table_count=$(run_sql_query master "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'dbo' AND TABLE_CATALOG = '${DB_NAME}' AND TABLE_TYPE = 'BASE TABLE'")
             if [ "${table_count}" -eq 18 ]; then
                 log_success "Phase 1 validation passed: 18 tables found"
-                return 0
             else
                 log_error "Phase 1 validation failed: Expected 18 tables, found ${table_count}"
                 return 1
@@ -206,64 +202,48 @@ validate_phase() {
             ;;
         2)
             log_info "Validating Phase 2: Checking encryption status..."
-            local encryption_state=$(sqlcmd -S "${SQL_HOST},${SQL_PORT}" -U "${SQL_USER}" \
-                -P "${SQL_PASSWORD}" -d master -h -1 \
-                -Q "SELECT encryption_state FROM sys.dm_database_encryption_keys WHERE database_id = DB_ID('${DB_NAME}')" 2>/dev/null | tr -d ' ')
-            
+            local encryption_state
+            encryption_state=$(run_sql_query master "SELECT encryption_state FROM sys.dm_database_encryption_keys WHERE database_id = DB_ID('${DB_NAME}')")
             if [ "${encryption_state}" -eq 3 ]; then
                 log_success "Phase 2 validation passed: TDE is encrypted"
-                return 0
             else
                 log_warning "Phase 2 validation: TDE encryption state = ${encryption_state}"
-                return 0  # Don't fail, could be transitioning
             fi
             ;;
         3)
             log_info "Validating Phase 3: Checking backup directories..."
             if [ -d "/var/opt/mssql/backup/full" ] && [ -d "/var/opt/mssql/backup/diff" ]; then
                 log_success "Phase 3 validation passed: Backup directories created"
-                return 0
             else
                 log_warning "Phase 3 validation: Backup directories may not be accessible"
-                return 0  # Non-critical
             fi
             ;;
         4)
             log_info "Validating Phase 4: Checking recovery procedures..."
-            local proc_count=$(sqlcmd -S "${SQL_HOST},${SQL_PORT}" -U "${SQL_USER}" \
-                -P "${SQL_PASSWORD}" -d "${DB_NAME}" -h -1 \
-                -Q "SELECT COUNT(*) FROM INFORMATION_SCHEMA.ROUTINES WHERE ROUTINE_TYPE = 'PROCEDURE' AND ROUTINE_NAME LIKE 'usp_Restore%'" 2>/dev/null | tr -d ' ')
-            
+            local proc_count
+            proc_count=$(run_sql_query "${DB_NAME}" "SELECT COUNT(*) FROM INFORMATION_SCHEMA.ROUTINES WHERE ROUTINE_TYPE = 'PROCEDURE' AND ROUTINE_NAME LIKE 'usp_Restore%'")
             if [ "${proc_count}" -gt 0 ]; then
                 log_success "Phase 4 validation passed: Found ${proc_count} recovery procedures"
-                return 0
             else
                 log_warning "Phase 4 validation: Recovery procedures not found yet"
-                return 0
             fi
             ;;
         5)
             log_info "Validating Phase 5: Checking monitoring objects..."
             log_success "Phase 5 validation passed: Monitoring scripts created"
-            return 0
             ;;
         6)
             log_info "Validating Phase 6: Checking test framework..."
             log_success "Phase 6 validation passed: Test framework initialized"
-            return 0
             ;;
         7)
             log_info "Validating Phase 7: Checking SQL Agent jobs..."
-            local job_count=$(sqlcmd -S "${SQL_HOST},${SQL_PORT}" -U "${SQL_USER}" \
-                -P "${SQL_PASSWORD}" -d msdb -h -1 \
-                -Q "SELECT COUNT(*) FROM sysjobs WHERE name LIKE 'HospitalBackup_%'" 2>/dev/null | tr -d ' ')
-            
+            local job_count
+            job_count=$(run_sql_query msdb "SELECT COUNT(*) FROM sysjobs WHERE name LIKE 'HospitalBackup_%'")
             if [ "${job_count}" -ge 11 ]; then
                 log_success "Phase 7 validation passed: Found ${job_count} SQL Agent jobs"
-                return 0
             else
                 log_warning "Phase 7 validation: Expected 11 jobs, found ${job_count}"
-                return 0
             fi
             ;;
     esac
@@ -365,7 +345,7 @@ main() {
     print_header "Hospital Database Backup Project - Complete Pipeline"
     
     log_info "Pipeline started"
-    log_info "SQL Server: ${SQL_HOST}:${SQL_PORT}"
+    log_info "SQL Server: ${SERVER_CONN}"
     log_info "Database: ${DB_NAME}"
     log_info "Log file: ${LOG_FILE}"
     echo ""

@@ -164,7 +164,7 @@ PRINT 'WAITFOR DELAY ''00:00:05'';';
 PRINT '';
 
 PRINT 'After executing a job test, query the results:';
-PRINT 'SELECT TOP 10 * FROM HospitalBackupDemo.dbo.SystemConfiguration ORDER BY LastUpdated DESC;';
+PRINT 'SELECT TOP 10 * FROM HospitalBackupDemo.dbo.SystemConfiguration ORDER BY LastModifiedDate DESC;';
 PRINT 'SELECT TOP 10 * FROM HospitalBackupDemo.dbo.BackupHistory ORDER BY VerificationDate DESC;';
 PRINT '';
 
@@ -205,12 +205,12 @@ PRINT '';
 
 SELECT TOP 20
     BackupType,
-    BackupDate,
+    BackupStartDate,
+    BackupStatus,
     VerificationStatus,
     VerificationDate,
-    BackupFile
+    BackupFileName
 FROM dbo.BackupHistory
-WHERE BackupType IN ('FULL_VERIFY', 'RECOVERY_DRILL_SUCCESS', 'LOG_CHAIN_VERIFY', 'BACKUP_ALERT_CHECK', 'ENCRYPTION_CHECK')
 ORDER BY VerificationDate DESC;
 
 PRINT '';
@@ -226,8 +226,8 @@ PRINT '';
 SELECT TOP 20
     ConfigKey,
     ConfigValue,
-    ConfigDescription,
-    LastUpdated
+    Description,
+    LastModifiedDate
 FROM dbo.SystemConfiguration
 WHERE ConfigKey IN (
     'BACKUP_VERIFY_ERROR',
@@ -240,7 +240,7 @@ WHERE ConfigKey IN (
     'ENCRYPTION_CERT_EXPIRY',
     'ENCRYPTION_SYMKEY_STATUS'
 )
-ORDER BY LastUpdated DESC;
+ORDER BY LastModifiedDate DESC;
 
 PRINT '';
 

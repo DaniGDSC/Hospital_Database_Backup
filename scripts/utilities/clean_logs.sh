@@ -1,11 +1,10 @@
 #!/bin/bash
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-PROJECT_ROOT="$( cd "$SCRIPT_DIR/../.." && pwd )"
+source "${SCRIPT_DIR}/../helpers/load_config.sh"
 
-echo "Cleaning old logs..."
+echo "Cleaning logs older than ${LOG_RETENTION_DAYS} days..."
 
-# Delete logs older than 30 days
-find "${PROJECT_ROOT}/logs" -name "*.log" -type f -mtime +30 -delete
+find "${PROJECT_ROOT}/logs" -name "*.log" -type f -mtime +${LOG_RETENTION_DAYS} -delete
 
 echo "✓ Old logs cleaned"
 ls -lh "${PROJECT_ROOT}/logs"

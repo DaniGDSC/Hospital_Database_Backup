@@ -6,17 +6,31 @@ CONFIG_FILE="${PROJECT_ROOT}/config/project.conf"
 
 if [ -f "$CONFIG_FILE" ]; then
     source "$CONFIG_FILE"
-    
+
     # Load environment-specific config if exists
     ENV=${ENV:-"development"}
     ENV_CONFIG="${PROJECT_ROOT}/config/${ENV}.conf"
-    
+
     if [ -f "$ENV_CONFIG" ]; then
         source "$ENV_CONFIG"
     fi
 else
     echo "Error: Configuration file not found: $CONFIG_FILE"
     exit 1
+fi
+
+# Shared ANSI color constants
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+# Build connection string with explicit port handling
+SERVER_CONN="${SQL_SERVER}"
+if [[ ! "$SERVER_CONN" =~ , ]]; then
+    SERVER_CONN="${SQL_SERVER},${SQL_PORT}"
 fi
 
 # Export all variables
@@ -29,5 +43,7 @@ export LOCAL_RETENTION_DAYS S3_RETENTION_DAYS LOG_BACKUP_RETENTION_HOURS
 export RTO_HOURS RPO_HOURS
 export NOTIFY_EMAIL SMTP_SERVER SMTP_PORT
 export LOG_LEVEL LOG_RETENTION_DAYS
-export CERT_BACKUP_DIR
+export CERT_BACKUP_DIR CERT_BACKUP_PASSWORD MASTER_KEY_PASSWORD CERT_S3_ENCRYPTION_KEY
 export ENV
+export RED GREEN YELLOW CYAN BLUE NC
+export SERVER_CONN

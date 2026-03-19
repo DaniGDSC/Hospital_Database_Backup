@@ -6,19 +6,18 @@
 USE msdb;
 GO
 
-PRINT 'Creating stored procedure sp_alert_backup_failure...';
+PRINT 'Creating stored procedure usp_AlertBackupFailure...';
 GO
 
 USE HospitalBackupDemo;
 GO
 
-IF EXISTS (SELECT 1 FROM sys.procedures WHERE name = 'sp_alert_backup_failure')
-    DROP PROCEDURE sp_alert_backup_failure;
+IF EXISTS (SELECT 1 FROM sys.procedures WHERE name = 'usp_AlertBackupFailure')
+    DROP PROCEDURE usp_AlertBackupFailure;
 GO
 
-CREATE PROCEDURE sp_alert_backup_failure
-    @AlertThresholdDays INT = 2,
-    @NotifyEmail NVARCHAR(MAX) = 'dba@hospital.local'
+CREATE PROCEDURE usp_AlertBackupFailure
+    @AlertThresholdDays INT = 2
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -32,27 +31,11 @@ BEGIN
     DECLARE @HasAlert BIT = 0;
 
     BEGIN TRY
-        -- Get latest backup times
-        SELECT TOP 1
-            @LastFullBackupTime = backup_start_date
-        FROM msdb.dbo.backupset
-        WHERE database_name = 'HospitalBackupDemo'
-            AND type = 'D' -- Full backup
-        ORDER BY backup_start_date DESC;
-
-        SELECT TOP 1
-            @LastDiffBackupTime = backup_start_date
-        FROM msdb.dbo.backupset
-        WHERE database_name = 'HospitalBackupDemo'
-            AND type = 'I' -- Differential backup
-        ORDER BY backup_start_date DESC;
-
-        SELECT TOP 1
-            @LastLogBackupTime = backup_start_date
-        FROM msdb.dbo.backupset
-        WHERE database_name = 'HospitalBackupDemo'
-            AND type = 'L' -- Log backup
-        ORDER BY backup_start_date DESC;
+        -- Get latest backup times via shared procedure
+        EXEC dbo.usp_GetBackupTimestamps
+            @LastFull = @LastFullBackupTime OUTPUT,
+            @LastDiff = @LastDiffBackupTime OUTPUT,
+            @LastLog  = @LastLogBackupTime OUTPUT;
 
         -- Calculate days since last backup
         SET @DaysSinceFullBackup = DATEDIFF(DAY, @LastFullBackupTime, GETDATE());
@@ -72,8 +55,8 @@ BEGIN
             SET @AlertMessage = 'CRITICAL: No full backup exists!';
             PRINT CONCAT('ALERT: ', @AlertMessage);
             INSERT INTO dbo.SystemConfiguration 
-            (ConfigKey, ConfigValue, ConfigDescription, LastUpdated)
-            VALUES ('BACKUP_ALERT_FULL', @AlertMessage, 'Daily backup failure alert', GETDATE());
+            (ConfigKey, ConfigValue, ConfigCategory, Description, LastModifiedDate)
+            VALUES ('BACKUP_ALERT_FULL', @AlertMessage, 'Backup', 'Daily backup failure alert', GETDATE());
             SET @HasAlert = 1;
         END
         ELSE IF @DaysSinceFullBackup > @AlertThresholdDays
@@ -81,8 +64,8 @@ BEGIN
             SET @AlertMessage = CONCAT('WARNING: Full backup is ', CAST(@DaysSinceFullBackup AS INT), ' days old (threshold: ', @AlertThresholdDays, ' days)');
             PRINT CONCAT('ALERT: ', @AlertMessage);
             INSERT INTO dbo.SystemConfiguration 
-            (ConfigKey, ConfigValue, ConfigDescription, LastUpdated)
-            VALUES ('BACKUP_ALERT_FULL', @AlertMessage, 'Daily backup failure alert', GETDATE());
+            (ConfigKey, ConfigValue, ConfigCategory, Description, LastModifiedDate)
+            VALUES ('BACKUP_ALERT_FULL', @AlertMessage, 'Backup', 'Daily backup failure alert', GETDATE());
             SET @HasAlert = 1;
         END
         ELSE
@@ -96,8 +79,8 @@ BEGIN
             SET @AlertMessage = 'WARNING: No log backup exists - PITR not possible';
             PRINT CONCAT('ALERT: ', @AlertMessage);
             INSERT INTO dbo.SystemConfiguration 
-            (ConfigKey, ConfigValue, ConfigDescription, LastUpdated)
-            VALUES ('BACKUP_ALERT_LOG', @AlertMessage, 'Daily backup failure alert', GETDATE());
+            (ConfigKey, ConfigValue, ConfigCategory, Description, LastModifiedDate)
+            VALUES ('BACKUP_ALERT_LOG', @AlertMessage, 'Backup', 'Daily backup failure alert', GETDATE());
             SET @HasAlert = 1;
         END
         ELSE IF @DaysSinceLogBackup > 1 -- Log backups should be more frequent
@@ -105,8 +88,8 @@ BEGIN
             SET @AlertMessage = CONCAT('WARNING: Log backup is ', CAST(@DaysSinceLogBackup AS INT), ' days old - check log backup schedule');
             PRINT CONCAT('ALERT: ', @AlertMessage);
             INSERT INTO dbo.SystemConfiguration 
-            (ConfigKey, ConfigValue, ConfigDescription, LastUpdated)
-            VALUES ('BACKUP_ALERT_LOG', @AlertMessage, 'Daily backup failure alert', GETDATE());
+            (ConfigKey, ConfigValue, ConfigCategory, Description, LastModifiedDate)
+            VALUES ('BACKUP_ALERT_LOG', @AlertMessage, 'Backup', 'Daily backup failure alert', GETDATE());
             SET @HasAlert = 1;
         END
         ELSE
@@ -119,19 +102,19 @@ BEGIN
         BEGIN
             PRINT '';
             PRINT 'All backup checks PASSED - no alerts generated';
-            INSERT INTO dbo.BackupHistory 
-            (BackupType, BackupDate, BackupFile, VerificationStatus, VerificationDate)
-            VALUES 
-            ('BACKUP_ALERT_CHECK', GETDATE(), 'All backups', 'PASSED', GETDATE());
+            INSERT INTO dbo.BackupHistory
+            (BackupType, BackupStartDate, BackupFileName, BackupLocation, BackupStatus, VerificationStatus, VerificationDate)
+            VALUES
+            ('Full', GETDATE(), 'All backups', 'Local Disk', 'Completed', 'Verified', GETDATE());
         END
         ELSE
         BEGIN
             PRINT '';
             PRINT 'ATTENTION: Backup alerts have been generated - review SystemConfiguration table';
-            INSERT INTO dbo.BackupHistory 
-            (BackupType, BackupDate, BackupFile, VerificationStatus, VerificationDate)
-            VALUES 
-            ('BACKUP_ALERT_CHECK', GETDATE(), 'All backups', 'ALERT', GETDATE());
+            INSERT INTO dbo.BackupHistory
+            (BackupType, BackupStartDate, BackupFileName, BackupLocation, BackupStatus, VerificationStatus, VerificationDate)
+            VALUES
+            ('Full', GETDATE(), 'All backups', 'Local Disk', 'Completed', 'Failed', GETDATE());
         END
 
     END TRY
@@ -140,15 +123,15 @@ BEGIN
         PRINT CONCAT('ERROR: ', @ErrorMessage);
         
         INSERT INTO dbo.SystemConfiguration 
-        (ConfigKey, ConfigValue, ConfigDescription, LastUpdated)
-        VALUES ('BACKUP_ALERT_ERROR', @ErrorMessage, 'Daily backup failure alert job failed', GETDATE());
+        (ConfigKey, ConfigValue, ConfigCategory, Description, LastModifiedDate)
+        VALUES ('BACKUP_ALERT_ERROR', @ErrorMessage, 'Backup', 'Daily backup failure alert job failed', GETDATE());
 
         RAISERROR(@ErrorMessage, 16, 1);
     END CATCH;
 END;
 GO
 
-PRINT 'Stored procedure sp_alert_backup_failure created successfully';
+PRINT 'Stored procedure usp_AlertBackupFailure created successfully';
 GO
 
 -- Create the SQL Agent Job (run in msdb)
@@ -172,7 +155,7 @@ EXEC sp_add_jobstep
     @step_name = N'Check_Backup_Age',
     @subsystem = N'TSQL',
     @database_name = N'HospitalBackupDemo',
-    @command = N'EXEC sp_alert_backup_failure @AlertThresholdDays = 2;',
+    @command = N'EXEC usp_AlertBackupFailure @AlertThresholdDays = 2;',
     @retry_attempts = 0,
     @on_success_action = 1,
     @on_fail_action = 2;

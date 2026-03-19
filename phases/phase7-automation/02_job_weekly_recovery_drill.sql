@@ -7,24 +7,24 @@ USE msdb;
 GO
 
 -- Step 1: Create the stored procedure (run in HospitalBackupDemo)
-PRINT 'Creating stored procedure sp_test_full_restore...';
+PRINT 'Creating stored procedure usp_TestFullRestore...';
 GO
 
 USE HospitalBackupDemo;
 GO
 
-IF EXISTS (SELECT 1 FROM sys.procedures WHERE name = 'sp_test_full_restore')
-    DROP PROCEDURE sp_test_full_restore;
+IF EXISTS (SELECT 1 FROM sys.procedures WHERE name = 'usp_TestFullRestore')
+    DROP PROCEDURE usp_TestFullRestore;
 GO
 
-CREATE PROCEDURE sp_test_full_restore
+CREATE PROCEDURE usp_TestFullRestore
     @TestDBName NVARCHAR(256) = NULL,
     @CleanupOldDrills BIT = 1
 AS
 BEGIN
     SET NOCOUNT ON;
     DECLARE @BackupFile NVARCHAR(MAX);
-    @DiffBackupFile NVARCHAR(MAX);
+    DECLARE @DiffBackupFile NVARCHAR(MAX);
     DECLARE @LogBackupFile NVARCHAR(MAX);
     DECLARE @RestoreDate DATETIME;
     DECLARE @SQLCmd NVARCHAR(MAX);
@@ -184,10 +184,10 @@ BEGIN
         END
 
         -- Step 7: Log success
-        INSERT INTO dbo.BackupHistory 
-        (BackupType, BackupDate, BackupFile, VerificationStatus, VerificationDate, BackupSize)
-        VALUES 
-        ('RECOVERY_DRILL_SUCCESS', GETDATE(), @TestDB, 'PASSED', GETDATE(), 0);
+        INSERT INTO dbo.BackupHistory
+        (BackupType, BackupStartDate, BackupFileName, BackupLocation, BackupStatus, VerificationStatus, VerificationDate)
+        VALUES
+        ('Full', GETDATE(), @TestDB, @TestDB, 'Completed', 'Verified', GETDATE());
 
         PRINT CONCAT('Recovery drill completed successfully!');
         PRINT CONCAT('Test database created: ', @TestDB);
@@ -199,15 +199,15 @@ BEGIN
         PRINT CONCAT('ERROR: ', @ErrorMessage);
         
         -- Log failure
-        INSERT INTO dbo.SystemConfiguration (ConfigKey, ConfigValue, ConfigDescription, LastUpdated)
-        VALUES ('RECOVERY_DRILL_ERROR', @ErrorMessage, 'Weekly recovery drill failed', GETDATE());
+        INSERT INTO dbo.SystemConfiguration (ConfigKey, ConfigValue, ConfigCategory, Description, LastModifiedDate)
+        VALUES ('RECOVERY_DRILL_ERROR', @ErrorMessage, 'Backup', 'Weekly recovery drill failed', GETDATE());
 
         RAISERROR(@ErrorMessage, 16, 1);
     END CATCH;
 END;
 GO
 
-PRINT 'Stored procedure sp_test_full_restore created successfully';
+PRINT 'Stored procedure usp_TestFullRestore created successfully';
 GO
 
 -- Step 2: Create the SQL Agent Job (run in msdb)
@@ -231,7 +231,7 @@ EXEC sp_add_jobstep
     @step_name = N'Run_Recovery_Drill',
     @subsystem = N'TSQL',
     @database_name = N'HospitalBackupDemo',
-    @command = N'EXEC sp_test_full_restore @CleanupOldDrills = 1;',
+    @command = N'EXEC usp_TestFullRestore @CleanupOldDrills = 1;',
     @retry_attempts = 1,
     @retry_interval = 10,
     @on_success_action = 1,

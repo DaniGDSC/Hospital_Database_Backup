@@ -2,6 +2,10 @@
 logs/*.log
 *.log
 
+# Configuration with secrets (NEVER commit!)
+config/project.conf
+*.enc
+
 # Certificates (NEVER commit these!)
 certificates-backup/*
 *.cer

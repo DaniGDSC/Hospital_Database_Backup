@@ -6,17 +6,17 @@
 USE msdb;
 GO
 
-PRINT 'Creating stored procedure sp_check_encryption_status...';
+PRINT 'Creating stored procedure usp_CheckEncryptionStatus...';
 GO
 
 USE HospitalBackupDemo;
 GO
 
-IF EXISTS (SELECT 1 FROM sys.procedures WHERE name = 'sp_check_encryption_status')
-    DROP PROCEDURE sp_check_encryption_status;
+IF EXISTS (SELECT 1 FROM sys.procedures WHERE name = 'usp_CheckEncryptionStatus')
+    DROP PROCEDURE usp_CheckEncryptionStatus;
 GO
 
-CREATE PROCEDURE sp_check_encryption_status
+CREATE PROCEDURE usp_CheckEncryptionStatus
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -44,8 +44,8 @@ BEGIN
             PRINT 'TDE: NOT INITIALIZED';
             SET @AlertMessage = 'WARNING: TDE not initialized on HospitalBackupDemo';
             INSERT INTO dbo.SystemConfiguration 
-            (ConfigKey, ConfigValue, ConfigDescription, LastUpdated)
-            VALUES ('ENCRYPTION_TDE_STATUS', @AlertMessage, 'Monthly encryption check', GETDATE());
+            (ConfigKey, ConfigValue, ConfigCategory, Description, LastModifiedDate)
+            VALUES ('ENCRYPTION_TDE_STATUS', @AlertMessage, 'Security', 'Monthly encryption check', GETDATE());
             SET @HasAlert = 1;
         END
         ELSE IF @TDEStatus = 3
@@ -61,8 +61,8 @@ BEGIN
             PRINT 'TDE: DECRYPTION IN PROGRESS';
             SET @AlertMessage = 'WARNING: TDE decryption in progress!';
             INSERT INTO dbo.SystemConfiguration 
-            (ConfigKey, ConfigValue, ConfigDescription, LastUpdated)
-            VALUES ('ENCRYPTION_TDE_STATUS', @AlertMessage, 'Monthly encryption check', GETDATE());
+            (ConfigKey, ConfigValue, ConfigCategory, Description, LastModifiedDate)
+            VALUES ('ENCRYPTION_TDE_STATUS', @AlertMessage, 'Security', 'Monthly encryption check', GETDATE());
             SET @HasAlert = 1;
         END
         ELSE
@@ -70,8 +70,8 @@ BEGIN
             PRINT CONCAT('TDE: UNKNOWN STATUS (', @TDEStatus, ')');
             SET @AlertMessage = CONCAT('WARNING: Unknown TDE status: ', @TDEStatus);
             INSERT INTO dbo.SystemConfiguration 
-            (ConfigKey, ConfigValue, ConfigDescription, LastUpdated)
-            VALUES ('ENCRYPTION_TDE_STATUS', @AlertMessage, 'Monthly encryption check', GETDATE());
+            (ConfigKey, ConfigValue, ConfigCategory, Description, LastModifiedDate)
+            VALUES ('ENCRYPTION_TDE_STATUS', @AlertMessage, 'Security', 'Monthly encryption check', GETDATE());
             SET @HasAlert = 1;
         END
 
@@ -85,8 +85,8 @@ BEGIN
             PRINT 'TDE Certificate: NOT FOUND';
             SET @AlertMessage = 'CRITICAL: TDE certificate not found!';
             INSERT INTO dbo.SystemConfiguration 
-            (ConfigKey, ConfigValue, ConfigDescription, LastUpdated)
-            VALUES ('ENCRYPTION_CERT_STATUS', @AlertMessage, 'Monthly encryption check', GETDATE());
+            (ConfigKey, ConfigValue, ConfigCategory, Description, LastModifiedDate)
+            VALUES ('ENCRYPTION_CERT_STATUS', @AlertMessage, 'Security', 'Monthly encryption check', GETDATE());
             SET @HasAlert = 1;
         END
         ELSE
@@ -104,8 +104,8 @@ BEGIN
                     SET @AlertMessage = 'CRITICAL: TDE certificate has EXPIRED!';
                     PRINT CONCAT('ALERT: ', @AlertMessage);
                     INSERT INTO dbo.SystemConfiguration 
-                    (ConfigKey, ConfigValue, ConfigDescription, LastUpdated)
-                    VALUES ('ENCRYPTION_CERT_EXPIRY', @AlertMessage, 'Monthly encryption check', GETDATE());
+                    (ConfigKey, ConfigValue, ConfigCategory, Description, LastModifiedDate)
+                    VALUES ('ENCRYPTION_CERT_EXPIRY', @AlertMessage, 'Security', 'Monthly encryption check', GETDATE());
                     SET @HasAlert = 1;
                 END
                 ELSE IF @DaysTillExpiry < 30
@@ -113,8 +113,8 @@ BEGIN
                     SET @AlertMessage = CONCAT('WARNING: TDE certificate expires in ', @DaysTillExpiry, ' days');
                     PRINT CONCAT('ALERT: ', @AlertMessage);
                     INSERT INTO dbo.SystemConfiguration 
-                    (ConfigKey, ConfigValue, ConfigDescription, LastUpdated)
-                    VALUES ('ENCRYPTION_CERT_EXPIRY', @AlertMessage, 'Monthly encryption check', GETDATE());
+                    (ConfigKey, ConfigValue, ConfigCategory, Description, LastModifiedDate)
+                    VALUES ('ENCRYPTION_CERT_EXPIRY', @AlertMessage, 'Security', 'Monthly encryption check', GETDATE());
                     SET @HasAlert = 1;
                 END
                 ELSE
@@ -124,17 +124,22 @@ BEGIN
             END
         END
 
-        -- Check if certificate backup exists
-        -- Certificate should be backed up to: /var/opt/mssql/backup/certificates/
-        DECLARE @CertBackupPath NVARCHAR(MAX) = '/var/opt/mssql/backup/certificates/HospitalBackupDemo_TDECert.cer';
-        DECLARE @PrivateKeyPath NVARCHAR(MAX) = '/var/opt/mssql/backup/certificates/HospitalBackupDemo_TDECert_privatekey.pvk';
+        -- Check certificate backup path from SystemConfiguration (falls back to default)
+        DECLARE @CertBackupDir NVARCHAR(MAX);
+        SELECT @CertBackupDir = ConfigValue
+        FROM dbo.SystemConfiguration
+        WHERE ConfigKey = 'CertBackupDir';
 
-        -- Note: Cannot directly check file existence from T-SQL without extended stored proc
-        -- This is logged as a manual verification step
+        IF @CertBackupDir IS NULL
+            SET @CertBackupDir = '/var/opt/mssql/backup/certificates';
+
+        DECLARE @CertBackupPath NVARCHAR(MAX) = @CertBackupDir + '/HospitalBackupDemo_TDECert.cer';
+        DECLARE @PrivateKeyPath NVARCHAR(MAX) = @CertBackupDir + '/HospitalBackupDemo_TDECert_privatekey.pvk';
+
         PRINT '';
         PRINT 'Certificate Backup Verification:';
         PRINT CONCAT('Expected location: ', @CertBackupPath);
-        PRINT 'Manual verification required: ls -la /var/opt/mssql/backup/certificates/';
+        PRINT CONCAT('Manual verify: ls -la ', @CertBackupDir, '/');
 
         -- Check symmetric key status
         DECLARE @SymKeyExists BIT;
@@ -154,8 +159,8 @@ BEGIN
             PRINT 'Symmetric Key: NOT FOUND';
             SET @AlertMessage = 'WARNING: Symmetric key for column encryption not found';
             INSERT INTO dbo.SystemConfiguration 
-            (ConfigKey, ConfigValue, ConfigDescription, LastUpdated)
-            VALUES ('ENCRYPTION_SYMKEY_STATUS', @AlertMessage, 'Monthly encryption check', GETDATE());
+            (ConfigKey, ConfigValue, ConfigCategory, Description, LastModifiedDate)
+            VALUES ('ENCRYPTION_SYMKEY_STATUS', @AlertMessage, 'Security', 'Monthly encryption check', GETDATE());
             SET @HasAlert = 1;
         END
 
@@ -165,18 +170,18 @@ BEGIN
         IF @HasAlert = 0
         BEGIN
             PRINT 'Encryption checks PASSED - no alerts ✓';
-            INSERT INTO dbo.BackupHistory 
-            (BackupType, BackupDate, BackupFile, VerificationStatus, VerificationDate)
-            VALUES 
-            ('ENCRYPTION_CHECK', GETDATE(), 'TDE & Certs', 'PASSED', GETDATE());
+            INSERT INTO dbo.BackupHistory
+            (BackupType, BackupStartDate, BackupFileName, BackupLocation, BackupStatus, VerificationStatus, VerificationDate)
+            VALUES
+            ('Full', GETDATE(), 'TDE & Certs', 'Local Disk', 'Completed', 'Verified', GETDATE());
         END
         ELSE
         BEGIN
             PRINT 'ATTENTION: Encryption alerts detected - review SystemConfiguration table';
-            INSERT INTO dbo.BackupHistory 
-            (BackupType, BackupDate, BackupFile, VerificationStatus, VerificationDate)
-            VALUES 
-            ('ENCRYPTION_CHECK', GETDATE(), 'TDE & Certs', 'ALERT', GETDATE());
+            INSERT INTO dbo.BackupHistory
+            (BackupType, BackupStartDate, BackupFileName, BackupLocation, BackupStatus, VerificationStatus, VerificationDate)
+            VALUES
+            ('Full', GETDATE(), 'TDE & Certs', 'Local Disk', 'Completed', 'Failed', GETDATE());
         END
 
     END TRY
@@ -185,15 +190,15 @@ BEGIN
         PRINT CONCAT('ERROR: ', @ErrorMessage);
         
         INSERT INTO dbo.SystemConfiguration 
-        (ConfigKey, ConfigValue, ConfigDescription, LastUpdated)
-        VALUES ('ENCRYPTION_CHECK_ERROR', @ErrorMessage, 'Monthly encryption check failed', GETDATE());
+        (ConfigKey, ConfigValue, ConfigCategory, Description, LastModifiedDate)
+        VALUES ('ENCRYPTION_CHECK_ERROR', @ErrorMessage, 'Security', 'Monthly encryption check failed', GETDATE());
 
         RAISERROR(@ErrorMessage, 16, 1);
     END CATCH;
 END;
 GO
 
-PRINT 'Stored procedure sp_check_encryption_status created successfully';
+PRINT 'Stored procedure usp_CheckEncryptionStatus created successfully';
 GO
 
 -- Create the SQL Agent Job (run in msdb)
@@ -217,7 +222,7 @@ EXEC sp_add_jobstep
     @step_name = N'Check_Encryption',
     @subsystem = N'TSQL',
     @database_name = N'HospitalBackupDemo',
-    @command = N'EXEC sp_check_encryption_status;',
+    @command = N'EXEC usp_CheckEncryptionStatus;',
     @retry_attempts = 0,
     @on_success_action = 1,
     @on_fail_action = 2;

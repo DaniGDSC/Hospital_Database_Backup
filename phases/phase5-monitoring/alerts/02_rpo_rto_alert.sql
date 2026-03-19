@@ -1,5 +1,6 @@
 -- RPO/RTO Monitoring & Alerting
 -- Monitors Recovery Point Objective (data freshness) and Recovery Time Objective (recovery speed)
+-- Uses shared procedure usp_GetBackupTimestamps created in 01_backup_failure_alert.sql
 USE msdb;
 GO
 
@@ -22,17 +23,18 @@ DECLARE @rpoTarget INT = 60;       -- 1 hour in minutes
 DECLARE @fullBackupTarget INT = 1; -- 1 day in days
 DECLARE @diffBackupTarget INT = 1; -- 1 day in days
 
--- Retrieve last backup times
-SELECT @lastFull = MAX(backup_finish_date) FROM backupset WHERE database_name = 'HospitalBackupDemo' AND type = 'D';
-SELECT @lastDiff = MAX(backup_finish_date) FROM backupset WHERE database_name = 'HospitalBackupDemo' AND type = 'I';
-SELECT @lastLog = MAX(backup_finish_date) FROM backupset WHERE database_name = 'HospitalBackupDemo' AND type = 'L';
+-- Retrieve last backup times via shared procedure
+EXEC HospitalBackupDemo.dbo.usp_GetBackupTimestamps
+    @LastFull = @lastFull OUTPUT,
+    @LastDiff = @lastDiff OUTPUT,
+    @LastLog  = @lastLog OUTPUT;
 
 -- Calculate RPO (time since last log backup)
 SET @rpoMinutes = ISNULL(DATEDIFF(MINUTE, @lastLog, GETDATE()), 999999);
 
 -- Calculate RTO estimate (recovery will need full + differential/logs)
 -- If no differential, add time for all log backups
-SET @rtoEstimateMinutes = CASE 
+SET @rtoEstimateMinutes = CASE
     WHEN @lastDiff IS NULL THEN 10 + (@rpoMinutes / 60) -- Full + logs
     ELSE 10 + DATEDIFF(MINUTE, @lastDiff, GETDATE()) / 60 -- Full + diff + logs
 END;

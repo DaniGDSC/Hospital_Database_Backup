@@ -1,0 +1,25 @@
+# ============================================
+# Hospital Backup Project Configuration (EXAMPLE)
+# ============================================
+# Copy to project.conf and set environment variables for secrets:
+#   cp config/project.conf.example config/project.conf
+#   export SQL_PASSWORD="your-sa-password"
+#   export MASTER_KEY_PASSWORD="your-master-key-password"
+#   export CERT_BACKUP_PASSWORD="your-cert-backup-password"
+#   export CERT_S3_ENCRYPTION_KEY="your-s3-encryption-passphrase"
+
+# SQL Server Configuration
+SQL_SERVER="127.0.0.1"
+SQL_PORT="14333"
+SQL_USER="${SQL_USER:-SA}"
+SQL_PASSWORD="${SQL_PASSWORD:?SQL_PASSWORD environment variable required}"
+DATABASE_NAME="HospitalBackupDemo"
+
+# AWS S3 Configuration
+S3_BUCKET_NAME="hospital-backup-prod-lock"
+S3_REGION="ap-southeast-1"
+
+# Encryption Key Management (NEVER hardcode — use env vars or secrets manager)
+CERT_BACKUP_PASSWORD="${CERT_BACKUP_PASSWORD:?required}"
+MASTER_KEY_PASSWORD="${MASTER_KEY_PASSWORD:?required}"
+CERT_S3_ENCRYPTION_KEY="${CERT_S3_ENCRYPTION_KEY:?required}"

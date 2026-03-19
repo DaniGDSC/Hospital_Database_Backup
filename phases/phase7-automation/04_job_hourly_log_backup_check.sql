@@ -6,17 +6,17 @@
 USE msdb;
 GO
 
-PRINT 'Creating stored procedure sp_validate_log_backup_chain...';
+PRINT 'Creating stored procedure usp_ValidateLogBackupChain...';
 GO
 
 USE HospitalBackupDemo;
 GO
 
-IF EXISTS (SELECT 1 FROM sys.procedures WHERE name = 'sp_validate_log_backup_chain')
-    DROP PROCEDURE sp_validate_log_backup_chain;
+IF EXISTS (SELECT 1 FROM sys.procedures WHERE name = 'usp_ValidateLogBackupChain')
+    DROP PROCEDURE usp_ValidateLogBackupChain;
 GO
 
-CREATE PROCEDURE sp_validate_log_backup_chain
+CREATE PROCEDURE usp_ValidateLogBackupChain
     @AlertThresholdMinutes INT = 60
 AS
 BEGIN
@@ -29,20 +29,19 @@ BEGIN
     DECLARE @AlertMessage NVARCHAR(MAX);
 
     BEGIN TRY
-        -- Get latest log backup time
-        SELECT TOP 1
-            @LastLogBackupTime = backup_start_date
-        FROM msdb.dbo.backupset
-        WHERE database_name = 'HospitalBackupDemo'
-            AND type = 'L' -- Log backup
-        ORDER BY backup_start_date DESC;
+        -- Get latest log backup time via shared procedure
+        DECLARE @UnusedFull DATETIME, @UnusedDiff DATETIME;
+        EXEC dbo.usp_GetBackupTimestamps
+            @LastFull = @UnusedFull OUTPUT,
+            @LastDiff = @UnusedDiff OUTPUT,
+            @LastLog  = @LastLogBackupTime OUTPUT;
 
         IF @LastLogBackupTime IS NULL
         BEGIN
             PRINT 'Warning: No log backups found in history';
             INSERT INTO dbo.SystemConfiguration 
-            (ConfigKey, ConfigValue, ConfigDescription, LastUpdated)
-            VALUES ('LOG_BACKUP_WARNING', 'No log backups exist', 'Hourly log backup validation', GETDATE());
+            (ConfigKey, ConfigValue, ConfigCategory, Description, LastModifiedDate)
+            VALUES ('LOG_BACKUP_WARNING', 'No log backups exist', 'Backup', 'Hourly log backup validation', GETDATE());
             RETURN;
         END
 
@@ -65,8 +64,8 @@ BEGIN
             
             -- Log alert
             INSERT INTO dbo.SystemConfiguration 
-            (ConfigKey, ConfigValue, ConfigDescription, LastUpdated)
-            VALUES ('LOG_BACKUP_ALERT', @AlertMessage, 'Hourly log backup validation', GETDATE());
+            (ConfigKey, ConfigValue, ConfigCategory, Description, LastModifiedDate)
+            VALUES ('LOG_BACKUP_ALERT', @AlertMessage, 'Backup', 'Hourly log backup validation', GETDATE());
 
             RAISERROR(@AlertMessage, 16, 1);
         END
@@ -80,9 +79,9 @@ BEGIN
 
         PRINT CONCAT('Log backups in last 24 hours: ', @LogBackupCount);
 
-        -- Validate log backup chain continuity by checking backup sequences
-        DECLARE @PrevLSN NUMERIC(25,0);
-        DECLARE @CurrLSN NUMERIC(25,0);
+        -- Validate log backup chain continuity by checking LSN sequences
+        DECLARE @FirstLSN NUMERIC(25,0);
+        DECLARE @LastLSN NUMERIC(25,0);
         DECLARE @LSNGap NUMERIC(25,0);
 
         DECLARE log_cursor CURSOR FOR
@@ -93,16 +92,15 @@ BEGIN
             ORDER BY backup_start_date DESC;
 
         OPEN log_cursor;
-        FETCH NEXT FROM log_cursor INTO @CurrLSN, @PrevLSN;
+        FETCH NEXT FROM log_cursor INTO @FirstLSN, @LastLSN;
 
         WHILE @@FETCH_STATUS = 0
         BEGIN
-            IF @PrevLSN IS NOT NULL
+            IF @LastLSN IS NOT NULL
             BEGIN
-                -- Check if LSN sequence is continuous
-                IF @CurrLSN > @PrevLSN
+                IF @FirstLSN > @LastLSN
                 BEGIN
-                    SET @LSNGap = @CurrLSN - @PrevLSN;
+                    SET @LSNGap = @FirstLSN - @LastLSN;
                     IF @LSNGap > 1
                     BEGIN
                         PRINT CONCAT('LSN Gap detected: ', @LSNGap);
@@ -110,7 +108,7 @@ BEGIN
                     END
                 END
             END
-            FETCH NEXT FROM log_cursor INTO @CurrLSN, @PrevLSN;
+            FETCH NEXT FROM log_cursor INTO @FirstLSN, @LastLSN;
         END
         CLOSE log_cursor;
         DEALLOCATE log_cursor;
@@ -121,10 +119,10 @@ BEGIN
         END
 
         -- Log successful validation
-        INSERT INTO dbo.BackupHistory 
-        (BackupType, BackupDate, BackupFile, VerificationStatus, VerificationDate)
-        VALUES 
-        ('LOG_CHAIN_VERIFY', GETDATE(), 'Log backup chain', 'VALID', GETDATE());
+        INSERT INTO dbo.BackupHistory
+        (BackupType, BackupStartDate, BackupFileName, BackupLocation, BackupStatus, VerificationStatus, VerificationDate)
+        VALUES
+        ('Transaction Log', GETDATE(), 'Log backup chain', 'Local Disk', 'Completed', 'Verified', GETDATE());
 
         PRINT 'Log backup chain validation passed';
 
@@ -134,15 +132,15 @@ BEGIN
         PRINT CONCAT('ERROR: ', @ErrorMessage);
         
         INSERT INTO dbo.SystemConfiguration 
-        (ConfigKey, ConfigValue, ConfigDescription, LastUpdated)
-        VALUES ('LOG_BACKUP_ERROR', @ErrorMessage, 'Hourly log backup validation failed', GETDATE());
+        (ConfigKey, ConfigValue, ConfigCategory, Description, LastModifiedDate)
+        VALUES ('LOG_BACKUP_ERROR', @ErrorMessage, 'Backup', 'Hourly log backup validation failed', GETDATE());
 
         RAISERROR(@ErrorMessage, 16, 1);
     END CATCH;
 END;
 GO
 
-PRINT 'Stored procedure sp_validate_log_backup_chain created successfully';
+PRINT 'Stored procedure usp_ValidateLogBackupChain created successfully';
 GO
 
 -- Create the SQL Agent Job (run in msdb)
@@ -166,7 +164,7 @@ EXEC sp_add_jobstep
     @step_name = N'Validate_Log_Chain',
     @subsystem = N'TSQL',
     @database_name = N'HospitalBackupDemo',
-    @command = N'EXEC sp_validate_log_backup_chain @AlertThresholdMinutes = 120;',
+    @command = N'EXEC usp_ValidateLogBackupChain @AlertThresholdMinutes = 120;',
     @retry_attempts = 2,
     @retry_interval = 5,
     @on_success_action = 1,

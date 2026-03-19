@@ -10,7 +10,7 @@ IF EXISTS (SELECT 1 FROM sysjobs WHERE name = N'HospitalBackup_Daily_Differentia
     EXEC sp_delete_job @job_name = N'HospitalBackup_Daily_DifferentialBackup', @delete_unused_schedule = 1;
 GO
 
-EXEC sp_add_job 
+EXEC sp_add_job
     @job_name = N'HospitalBackup_Daily_DifferentialBackup',
     @enabled = 1,
     @description = N'Daily encrypted differential backup to local disk',
@@ -18,13 +18,13 @@ EXEC sp_add_job
     @category_name = N'Database Maintenance';
 GO
 
--- Step: Local encrypted differential backup
+-- Step: Local encrypted differential backup via shared procedure
 EXEC sp_add_jobstep
     @job_name = N'HospitalBackup_Daily_DifferentialBackup',
     @step_name = N'Differential_Backup_Local',
     @subsystem = N'TSQL',
-    @database_name = N'master',
-    @command = N':r /home/un1/hospital-db-backup-project/phases/phase3-backup/differential/01_differential_backup.sql',
+    @database_name = N'HospitalBackupDemo',
+    @command = N'EXEC dbo.usp_PerformBackup @BackupType = N''DIFFERENTIAL'';',
     @retry_attempts = 1,
     @retry_interval = 5,
     @on_success_action = 1, -- Quit with success

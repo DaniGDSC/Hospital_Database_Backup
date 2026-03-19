@@ -24,15 +24,6 @@ echo "Verifying SQL Server connection..."
 echo "✓ Connection verified"
 echo ""
 
-# Define job scripts
-declare -a STORED_PROCEDURES=(
-    "sp_verify_last_backup"
-    "sp_test_full_restore"
-    "sp_validate_log_backup_chain"
-    "sp_alert_backup_failure"
-    "sp_check_encryption_status"
-)
-
 declare -a JOB_SCRIPTS=(
     "01_job_daily_backup_verify.sql"
     "02_job_weekly_recovery_drill.sql"
@@ -41,7 +32,7 @@ declare -a JOB_SCRIPTS=(
     "06_job_monthly_encryption_check.sql"
 )
 
-PHASE7_DIR="${PROJECT_ROOT}/phase7-automation"
+PHASE7_DIR="${PROJECT_ROOT}/phases/phase7-automation"
 
 # Step 1: Deploy Stored Procedures (do these first, one by one from job scripts)
 echo "Deploying stored procedures..."
@@ -94,56 +85,29 @@ fi
 
 echo ""
 
-# Step 3: Display Job Schedule Summary
+# Step 3: Display deployed jobs dynamically from SQL Agent
 echo "=== Deployed Automation Jobs ==="
 echo ""
-echo "1. Daily Backup Verification (01:00 AM)"
-echo "   Job: HospitalBackup_Daily_Verify"
-echo "   Procedure: sp_verify_last_backup"
-echo "   Purpose: Verify latest full backup integrity"
-echo ""
 
-echo "2. Weekly Recovery Drill (Sunday 02:00 AM)"
-echo "   Job: HospitalBackup_Weekly_RecoveryDrill"
-echo "   Procedure: sp_test_full_restore"
-echo "   Purpose: Test restore to alternate database"
-echo ""
+JOB_SUMMARY_QUERY="
+USE msdb;
+SELECT
+    j.name AS JobName,
+    j.description AS Description,
+    CASE j.enabled WHEN 1 THEN 'Enabled' ELSE 'Disabled' END AS Status,
+    CONVERT(VARCHAR, j.date_created, 120) AS Created
+FROM sysjobs j
+WHERE j.name LIKE 'HospitalBackup_%'
+ORDER BY j.name;
+"
 
-echo "3. Hourly Log Backup Validation (Every hour)"
-echo "   Job: HospitalBackup_Hourly_LogChain"
-echo "   Procedure: sp_validate_log_backup_chain"
-echo "   Purpose: Validate log backup chain continuity"
-echo ""
+echo "$JOB_SUMMARY_QUERY" | sqlcmd -S "$SERVER_CONN" -U "$SQL_USER" -P "$SQL_PASSWORD" -C 2>/dev/null || {
+    echo "  (Could not query job list — SQL Agent may not be accessible)"
+}
 
-echo "4. Daily Backup Failure Alert (06:00 AM)"
-echo "   Job: HospitalBackup_Daily_Alert"
-echo "   Procedure: sp_alert_backup_failure"
-echo "   Purpose: Alert if backup > 2 days old"
-echo ""
-
-echo "5. Monthly Encryption Check (15th at 22:00)"
-echo "   Job: HospitalBackup_Monthly_EncryptionCheck"
-echo "   Procedure: sp_check_encryption_status"
-echo "   Purpose: Verify TDE certificate status"
-echo ""
-
-# Step 4: Testing Instructions
-echo "=== Testing Instructions ==="
 echo ""
 echo "To manually test a job:"
-echo "  EXEC sp_start_job @job_name = 'HospitalBackup_Daily_Verify';"
-echo "  EXEC sp_start_job @job_name = 'HospitalBackup_Weekly_RecoveryDrill';"
-echo "  EXEC sp_start_job @job_name = 'HospitalBackup_Hourly_LogChain';"
-echo "  EXEC sp_start_job @job_name = 'HospitalBackup_Daily_Alert';"
-echo "  EXEC sp_start_job @job_name = 'HospitalBackup_Monthly_EncryptionCheck';"
-echo ""
-
-echo "To view job history:"
-echo "  SELECT job_name, run_status, run_date, run_time, message"
-echo "  FROM msdb.dbo.sysjobhistory h"
-echo "  JOIN msdb.dbo.sysjobs j ON h.job_id = j.job_id"
-echo "  WHERE j.name LIKE 'HospitalBackup_%'"
-echo "  ORDER BY run_date DESC, run_time DESC;"
+echo "  EXEC msdb.dbo.sp_start_job @job_name = N'<job_name>';"
 echo ""
 
 # Step 5: Verify SQL Agent is running
