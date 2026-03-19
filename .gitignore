@@ -4,6 +4,7 @@ logs/*.log
 
 # Configuration with secrets (NEVER commit!)
 config/project.conf
+.env
 *.enc
 
 # Certificates (NEVER commit these!)

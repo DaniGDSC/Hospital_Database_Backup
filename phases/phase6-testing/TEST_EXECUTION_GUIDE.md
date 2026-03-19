@@ -7,33 +7,33 @@ Phase 6 provides comprehensive testing framework with automated metrics tracking
 
 ```bash
 # 1. Create test metrics framework
-sqlcmd -S 127.0.0.1,14333 -U SA -P 'Daniel@2410' \
+sqlcmd -S 127.0.0.1,14333 -U SA -P "$SQL_PASSWORD" \
   -i phases/phase6-testing/99_test_metrics_framework.sql
 
 # 2. Run unit tests
-sqlcmd -S 127.0.0.1,14333 -U SA -P 'Daniel@2410' \
+sqlcmd -S 127.0.0.1,14333 -U SA -P "$SQL_PASSWORD" \
   -i phases/phase6-testing/unit-tests/01_schema_integrity.sql
 
 # 3. Run security tests
-sqlcmd -S 127.0.0.1,14333 -U SA -P 'Daniel@2410' \
+sqlcmd -S 127.0.0.1,14333 -U SA -P "$SQL_PASSWORD" \
   -i phases/phase6-testing/security-tests/01_rbac_validation.sql
 
-sqlcmd -S 127.0.0.1,14333 -U SA -P 'Daniel@2410' \
+sqlcmd -S 127.0.0.1,14333 -U SA -P "$SQL_PASSWORD" \
   -i phases/phase6-testing/security-tests/02_security_test_results.sql
 
 # 4. Run disaster recovery tests
-sqlcmd -S 127.0.0.1,14333 -U SA -P 'Daniel@2410' \
+sqlcmd -S 127.0.0.1,14333 -U SA -P "$SQL_PASSWORD" \
   -i phases/phase6-testing/scenarios/01_disaster_scenarios.sql
 
-sqlcmd -S 127.0.0.1,14333 -U SA -P 'Daniel@2410' \
+sqlcmd -S 127.0.0.1,14333 -U SA -P "$SQL_PASSWORD" \
   -i phases/phase6-testing/scenarios/02_disaster_recovery_test_execution.sql
 
 # 5. Run performance baseline
-sqlcmd -S 127.0.0.1,14333 -U SA -P 'Daniel@2410' \
+sqlcmd -S 127.0.0.1,14333 -U SA -P "$SQL_PASSWORD" \
   -i phases/phase6-testing/performance-tests/01_index_usage_baseline.sql
 
 # 6. Run load & stress tests
-sqlcmd -S 127.0.0.1,14333 -U SA -P 'Daniel@2410' \
+sqlcmd -S 127.0.0.1,14333 -U SA -P "$SQL_PASSWORD" \
   -i phases/phase6-testing/performance-tests/02_load_stress_testing.sql
 ```
 
@@ -278,7 +278,7 @@ GO
 
 #### Generate Daily Test Report
 ```bash
-sqlcmd -S 127.0.0.1,14333 -U SA -P 'Daniel@2410' \
+sqlcmd -S 127.0.0.1,14333 -U SA -P "$SQL_PASSWORD" \
   -Q "SELECT GETDATE() as 'Report Date'; 
       SELECT * FROM vw_TestExecutionSummary;
       SELECT * FROM vw_DisasterRecoveryPerformance;
@@ -289,7 +289,7 @@ sqlcmd -S 127.0.0.1,14333 -U SA -P 'Daniel@2410' \
 #### Export Results for Analysis
 ```bash
 # Export to CSV
-sqlcmd -S 127.0.0.1,14333 -U SA -P 'Daniel@2410' \
+sqlcmd -S 127.0.0.1,14333 -U SA -P "$SQL_PASSWORD" \
   -Q "SELECT * FROM dbo.DisasterScenarioResults WHERE TestDateTime >= DATEADD(DAY, -7, GETDATE())" \
   -o disaster_recovery_results.csv
 ```

@@ -343,13 +343,20 @@ main() {
     done
     
     print_header "Hospital Database Backup Project - Complete Pipeline"
-    
+
     log_info "Pipeline started"
     log_info "SQL Server: ${SERVER_CONN}"
     log_info "Database: ${DB_NAME}"
     log_info "Log file: ${LOG_FILE}"
     echo ""
-    
+
+    # Pre-flight: validate all required secrets are set
+    if ! validate_secrets; then
+        log_error "Secrets validation failed — aborting pipeline"
+        exit 1
+    fi
+    echo ""
+
     # Test SQL connection
     if ! test_sql_connection; then
         log_error "Cannot proceed without SQL Server connection"

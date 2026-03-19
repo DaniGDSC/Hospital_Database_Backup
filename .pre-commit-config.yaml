@@ -1,0 +1,36 @@
+# Pre-commit hooks for Hospital Database Backup Project
+# Install: pip install pre-commit && pre-commit install
+# Run manually: pre-commit run --all-files
+repos:
+  # Hook 1: Secrets scanning (gitleaks)
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.18.4
+    hooks:
+      - id: gitleaks
+
+  # Hook 2: Shell script linting (shellcheck)
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.10.0.1
+    hooks:
+      - id: shellcheck
+        args: ['--severity=error']
+
+  # Hook 3: Large file blocker (no binaries in repo)
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: check-added-large-files
+        args: ['--maxkb=1024']
+      - id: check-merge-conflict
+      - id: trailing-whitespace
+        args: ['--markdown-linebreak-ext=md']
+      - id: end-of-file-fixer
+
+  # Hook 4: Forbidden files check
+  - repo: local
+    hooks:
+      - id: no-secrets-files
+        name: Block forbidden files
+        entry: bash -c 'for f in "$@"; do case "$f" in *.pvk|*.cer|*.pfx|.env|config/project.conf) echo "BLOCKED: $f must not be committed"; exit 1;; esac; done'
+        language: system
+        types: [file]

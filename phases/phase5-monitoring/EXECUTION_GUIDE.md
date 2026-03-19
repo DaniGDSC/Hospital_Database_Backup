@@ -7,27 +7,27 @@ Phase 5 provides comprehensive monitoring and alerting for the hospital database
 
 #### Run Health Checks (Manual)
 ```bash
-sqlcmd -S 127.0.0.1,14333 -U SA -P 'Daniel@2410' -i phases/phase5-monitoring/health-checks/01_health_check.sql
+sqlcmd -S 127.0.0.1,14333 -U SA -P "$SQL_PASSWORD" -i phases/phase5-monitoring/health-checks/01_health_check.sql
 ```
 
 #### Run Backup Alerts (Manual)
 ```bash
-sqlcmd -S 127.0.0.1,14333 -U SA -P 'Daniel@2410' -i phases/phase5-monitoring/alerts/01_backup_failure_alert.sql
+sqlcmd -S 127.0.0.1,14333 -U SA -P "$SQL_PASSWORD" -i phases/phase5-monitoring/alerts/01_backup_failure_alert.sql
 ```
 
 #### Run RPO/RTO Monitoring (Manual)
 ```bash
-sqlcmd -S 127.0.0.1,14333 -U SA -P 'Daniel@2410' -i phases/phase5-monitoring/alerts/02_rpo_rto_alert.sql
+sqlcmd -S 127.0.0.1,14333 -U SA -P "$SQL_PASSWORD" -i phases/phase5-monitoring/alerts/02_rpo_rto_alert.sql
 ```
 
 #### Run Disk Space Monitoring (Manual)
 ```bash
-sqlcmd -S 127.0.0.1,14333 -U SA -P 'Daniel@2410' -i phases/phase5-monitoring/alerts/03_disk_space_alert.sql
+sqlcmd -S 127.0.0.1,14333 -U SA -P "$SQL_PASSWORD" -i phases/phase5-monitoring/alerts/03_disk_space_alert.sql
 ```
 
 #### Run Weekly Report (Manual)
 ```bash
-sqlcmd -S 127.0.0.1,14333 -U SA -P 'Daniel@2410' -i phases/phase5-monitoring/reports/01_weekly_report.sql
+sqlcmd -S 127.0.0.1,14333 -U SA -P "$SQL_PASSWORD" -i phases/phase5-monitoring/reports/01_weekly_report.sql
 ```
 
 ### Configuring Automated Monitoring

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Run SQL script with logging
+# Run SQL script with logging — passes secrets via sqlcmd -v (never logged)
 
 # Load configuration
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -34,12 +34,19 @@ echo "Database : $DB_NAME"
 echo "Log      : $LOG_FILE"
 echo ""
 
-# Build optional sqlcmd variable args (env var → sqlcmd variable name)
+# Build sqlcmd variable args (env var name → sqlcmd variable name)
+# Secrets and config values are passed to SQL scripts via -v
 declare -A SQLCMD_VARS=(
     [S3_BUCKET_NAME]="S3_BUCKET_NAME"
     [S3_REGION]="S3_REGION"
     [S3_ACCESS_KEY_ID]="S3_IDENTITY"
     [S3_SECRET_ACCESS_KEY]="S3_SECRET"
+    [MASTER_KEY_PASSWORD]="MASTER_KEY_PASSWORD"
+    [CERT_BACKUP_PASSWORD]="CERT_BACKUP_PASSWORD"
+    [APP_RW_PASSWORD]="APP_RW_PASSWORD"
+    [APP_RO_PASSWORD]="APP_RO_PASSWORD"
+    [APP_BILLING_PASSWORD]="APP_BILLING_PASSWORD"
+    [APP_AUDIT_PASSWORD]="APP_AUDIT_PASSWORD"
 )
 VAR_ARGS=()
 for env_var in "${!SQLCMD_VARS[@]}"; do
