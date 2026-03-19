@@ -39,7 +39,7 @@ fi
 # Check 3: Database Mail
 echo ""
 echo -e "${BLUE}[3/3] Database Mail${NC}"
-MAIL_STATUS=$(sqlcmd -S "$SERVER_CONN" -U "$SQL_USER" -P "$SQL_PASSWORD" -C \
+MAIL_STATUS=$(sqlcmd -S "$SERVER_CONN" -U "$SQL_USER" -P "$SQL_PASSWORD" ${SQLCMD_ENCRYPT_FLAGS} \
     -h -1 -Q "SELECT CASE WHEN EXISTS(SELECT 1 FROM msdb.dbo.sysmail_profile) THEN 'OK' ELSE 'NO_PROFILE' END" \
     2>/dev/null | tr -d ' ' || echo "UNREACHABLE")
 if [ "$MAIL_STATUS" = "OK" ]; then

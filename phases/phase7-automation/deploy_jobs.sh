@@ -101,7 +101,7 @@ WHERE j.name LIKE 'HospitalBackup_%'
 ORDER BY j.name;
 "
 
-echo "$JOB_SUMMARY_QUERY" | sqlcmd -S "$SERVER_CONN" -U "$SQL_USER" -P "$SQL_PASSWORD" -C 2>/dev/null || {
+echo "$JOB_SUMMARY_QUERY" | sqlcmd -S "$SERVER_CONN" -U "$SQL_USER" -P "$SQL_PASSWORD" ${SQLCMD_ENCRYPT_FLAGS} 2>/dev/null || {
     echo "  (Could not query job list — SQL Agent may not be accessible)"
 }
 

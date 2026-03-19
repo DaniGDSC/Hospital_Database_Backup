@@ -1,0 +1,101 @@
+name: CD Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      approver:
+        description: 'Senior DBA who approved this deployment'
+        required: true
+      reason:
+        description: 'Reason for production deployment'
+        required: true
+      maintenance_window:
+        description: 'Maintenance window (e.g. 2026-03-23 02:00 UTC)'
+        required: true
+
+jobs:
+  deploy-production:
+    name: Deploy to Production
+    runs-on: self-hosted
+    environment: production
+
+    steps:
+      - name: Validate — no self-approval
+        run: |
+          DEPLOYER="${{ github.actor }}"
+          APPROVER="${{ github.event.inputs.approver }}"
+          if [ "$DEPLOYER" = "$APPROVER" ]; then
+            echo "::error::BLOCKED: Self-approval not allowed (deployer=$DEPLOYER, approver=$APPROVER)"
+            exit 1
+          fi
+          echo "✅ Separation of Duties: deployer=$DEPLOYER, approver=$APPROVER"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Version consistency check
+        env:
+          APP_ENV: production
+          PRODUCTION_CONFIRMED: "yes"
+          SQL_PASSWORD: ${{ secrets.PROD_SQL_PASSWORD }}
+        run: bash scripts/utilities/verify_versions.sh
+
+      - name: Pre-deployment backup
+        env:
+          APP_ENV: production
+          PRODUCTION_CONFIRMED: "yes"
+          SQL_PASSWORD: ${{ secrets.PROD_SQL_PASSWORD }}
+        run: |
+          sqlcmd -S 127.0.0.1,14333 -U "$SQL_USER" \
+            -P "$SQL_PASSWORD" -N -C \
+            -d HospitalBackupDemo \
+            -Q "EXEC dbo.usp_PerformBackup @BackupType='FULL'"
+          echo "✅ Pre-deployment backup completed"
+
+      - name: Deploy to production
+        env:
+          APP_ENV: production
+          PRODUCTION_CONFIRMED: "yes"
+          DEPLOY_APPROVER: ${{ github.event.inputs.approver }}
+          SQL_PASSWORD: ${{ secrets.PROD_SQL_PASSWORD }}
+        run: |
+          # Skip interactive confirmation in CI — approval via GitHub UI
+          echo "I approve deployment to production" | \
+            bash scripts/deploy_production.sh
+
+      - name: Post-deployment verification
+        env:
+          SQL_PASSWORD: ${{ secrets.PROD_SQL_PASSWORD }}
+        run: |
+          sqlcmd -S 127.0.0.1,14333 -U "$SQL_USER" \
+            -P "$SQL_PASSWORD" -N -C \
+            -d HospitalBackupDemo \
+            -i phases/phase6-testing/unit-tests/01_schema_integrity.sql \
+            -o post_deploy.txt 2>&1
+          cat post_deploy.txt
+          if grep -qi "FAIL" post_deploy.txt; then
+            echo "::error::Post-deployment verification FAILED"
+            exit 1
+          fi
+
+      - name: Log deployment
+        if: always()
+        run: |
+          echo "{\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"deployer\":\"${{ github.actor }}\",\"approver\":\"${{ github.event.inputs.approver }}\",\"reason\":\"${{ github.event.inputs.reason }}\",\"commit\":\"${{ github.sha }}\",\"status\":\"${{ job.status }}\"}" >> logs/deployment_history.json || true
+
+      - name: Notify all parties
+        if: always()
+        run: |
+          STATUS="${{ job.status }}"
+          [ "$STATUS" = "success" ] && EMOJI="✅" || EMOJI="❌"
+          MSG="${EMOJI} PRODUCTION Deploy: ${STATUS}
+          Deployed by: ${{ github.actor }}
+          Approved by: ${{ github.event.inputs.approver }}
+          Reason: ${{ github.event.inputs.reason }}
+          Window: ${{ github.event.inputs.maintenance_window }}
+          Commit: ${{ github.sha }}"
+
+          curl -s -X POST \
+            "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d text="$MSG" || true

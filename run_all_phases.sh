@@ -22,8 +22,26 @@ LOGS_DIR="${PROJECT_ROOT}/logs"
 RUNNER="${SCRIPT_DIR}/runners/run_phase.sh"
 
 # Load SQL Server configuration from central config
+export PRODUCTION_GUARD_ACTIVE="true"
 source "${SCRIPT_DIR}/helpers/load_config.sh"
 DB_NAME="${DATABASE_NAME}"
+
+# Environment banner
+echo ""
+echo "╔════════════════════════════════════════════════╗"
+echo "  Environment: ${ENVIRONMENT}"
+echo "  Database:    ${DATABASE_NAME}"
+echo "  S3 Bucket:   ${S3_BUCKET_NAME}"
+echo "╚════════════════════════════════════════════════╝"
+echo ""
+
+# Version verification (non-blocking on dev, strict on staging/prod)
+"${SCRIPT_DIR}/utilities/verify_versions.sh" || {
+    if [ "${ENVIRONMENT}" != "development" ]; then
+        echo "BLOCKED: Version check failed on ${ENVIRONMENT}"
+        exit 1
+    fi
+}
 
 # Logging
 LOG_FILE="${LOGS_DIR}/pipeline_$(date +%Y%m%d_%H%M%S).log"
@@ -91,7 +109,7 @@ test_sql_connection() {
     log_info "Testing SQL Server connection..."
 
     if ! sqlcmd -S "${SERVER_CONN}" -U "${SQL_USER}" -P "${SQL_PASSWORD}" \
-        -Q "SELECT 1" &>/dev/null; then
+        ${SQLCMD_ENCRYPT_FLAGS} -Q "SELECT 1" &>/dev/null; then
         log_error "Failed to connect to SQL Server at ${SERVER_CONN}"
         return 1
     fi
@@ -104,7 +122,7 @@ check_database_exists() {
     local db_name=$1
 
     if sqlcmd -S "${SERVER_CONN}" -U "${SQL_USER}" -P "${SQL_PASSWORD}" \
-        -Q "SELECT 1 FROM sys.databases WHERE name = '${db_name}'" 2>/dev/null | grep -q "1"; then
+        ${SQLCMD_ENCRYPT_FLAGS} -Q "SELECT 1 FROM sys.databases WHERE name = '${db_name}'" 2>/dev/null | grep -q "1"; then
         return 0
     fi
     return 1
@@ -156,7 +174,7 @@ declare -A PHASE_DESCRIPTIONS=(
 
 run_sql_query() {
     sqlcmd -S "${SERVER_CONN}" -U "${SQL_USER}" -P "${SQL_PASSWORD}" \
-        -d "${1}" -h -1 -Q "${2}" 2>/dev/null | tr -d ' '
+        ${SQLCMD_ENCRYPT_FLAGS} -d "${1}" -h -1 -Q "${2}" 2>/dev/null | tr -d ' '
 }
 
 run_phase() {

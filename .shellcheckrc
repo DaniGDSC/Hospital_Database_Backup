@@ -1,0 +1,7 @@
+# ShellCheck configuration
+shell=bash
+severity=error
+# Allow sourcing files that ShellCheck can't follow
+exclude=SC1091
+# Allow unquoted SQLCMD_ENCRYPT_FLAGS (must word-split)
+exclude=SC2086

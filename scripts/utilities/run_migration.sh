@@ -30,7 +30,7 @@ echo "Description: ${DESCRIPTION}"
 echo ""
 
 # Check if already applied
-ALREADY_APPLIED=$(sqlcmd -S "$SERVER_CONN" -U "$SQL_USER" -P "$SQL_PASSWORD" -C \
+ALREADY_APPLIED=$(sqlcmd -S "$SERVER_CONN" -U "$SQL_USER" -P "$SQL_PASSWORD" ${SQLCMD_ENCRYPT_FLAGS} \
     -d HospitalBackupDemo -h -1 \
     -Q "SELECT COUNT(*) FROM dbo.SchemaVersionHistory WHERE Version='${VERSION}' AND Status='SUCCESS'" \
     2>/dev/null | tr -d ' ')
@@ -48,7 +48,7 @@ echo "Checksum: ${CHECKSUM}"
 echo "Executing migration..."
 START_MS=$(date +%s%N)
 
-if sqlcmd -S "$SERVER_CONN" -U "$SQL_USER" -P "$SQL_PASSWORD" -C \
+if sqlcmd -S "$SERVER_CONN" -U "$SQL_USER" -P "$SQL_PASSWORD" ${SQLCMD_ENCRYPT_FLAGS} \
     -d HospitalBackupDemo \
     -i "$MIGRATION_FILE" 2>&1; then
 
@@ -56,7 +56,7 @@ if sqlcmd -S "$SERVER_CONN" -U "$SQL_USER" -P "$SQL_PASSWORD" -C \
     DURATION_MS=$(( (END_MS - START_MS) / 1000000 ))
 
     # Record success
-    sqlcmd -S "$SERVER_CONN" -U "$SQL_USER" -P "$SQL_PASSWORD" -C \
+    sqlcmd -S "$SERVER_CONN" -U "$SQL_USER" -P "$SQL_PASSWORD" ${SQLCMD_ENCRYPT_FLAGS} \
         -d HospitalBackupDemo \
         -Q "INSERT INTO dbo.SchemaVersionHistory (Version, Description, ExecutionMs, Checksum, Status, RollbackScript) VALUES ('${VERSION}', '${DESCRIPTION}', ${DURATION_MS}, '${CHECKSUM}', 'SUCCESS', '${MIGRATION_FILE%.sql}__rollback.sql')" \
         2>/dev/null
@@ -68,7 +68,7 @@ else
     DURATION_MS=$(( (END_MS - START_MS) / 1000000 ))
 
     # Record failure
-    sqlcmd -S "$SERVER_CONN" -U "$SQL_USER" -P "$SQL_PASSWORD" -C \
+    sqlcmd -S "$SERVER_CONN" -U "$SQL_USER" -P "$SQL_PASSWORD" ${SQLCMD_ENCRYPT_FLAGS} \
         -d HospitalBackupDemo \
         -Q "INSERT INTO dbo.SchemaVersionHistory (Version, Description, ExecutionMs, Checksum, Status, ErrorMessage) VALUES ('${VERSION}', '${DESCRIPTION}', ${DURATION_MS}, '${CHECKSUM}', 'FAILED', 'See execution log')" \
         2>/dev/null

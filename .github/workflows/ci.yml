@@ -1,0 +1,133 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: ['*']
+  pull_request:
+    branches: [main]
+
+jobs:
+  ci:
+    name: Lint + Test
+    runs-on: ubuntu-latest
+
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: Y
+          MSSQL_SA_PASSWORD: ${{ secrets.CI_SA_PASSWORD }}
+          MSSQL_PID: Developer
+        ports:
+          - 14333:1433
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P $MSSQL_SA_PASSWORD -C -Q 'SELECT 1' -b"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # ── Secrets Scan ──
+      - name: Scan for secrets (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── Shell Linting ──
+      - name: ShellCheck
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: './scripts'
+          severity: error
+
+      # ── SQL Linting ──
+      - name: Install sqlfluff
+        run: pip install sqlfluff==3.0.0
+
+      - name: Lint SQL files
+        run: |
+          sqlfluff lint phases/ \
+            --dialect tsql \
+            --exclude-rules LT05,ST06,RF04 \
+            --ignore parsing \
+            || echo "::warning::SQL lint issues found (non-blocking)"
+
+      # ── Install SQL Tools ──
+      - name: Install sqlcmd
+        run: |
+          curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | \
+            sudo gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg
+          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/ubuntu/22.04/prod jammy main" | \
+            sudo tee /etc/apt/sources.list.d/mssql-release.list
+          sudo apt-get update
+          sudo ACCEPT_EULA=Y apt-get install -y mssql-tools18 unixodbc-dev
+          echo "/opt/mssql-tools18/bin" >> "$GITHUB_PATH"
+
+      # ── Wait for SQL Server ──
+      - name: Wait for SQL Server
+        run: |
+          for i in $(seq 1 30); do
+            sqlcmd -S 127.0.0.1,14333 -U sa \
+              -P "${{ secrets.CI_SA_PASSWORD }}" \
+              -C -Q "SELECT 1" -b 2>/dev/null && break
+            echo "Waiting for SQL Server... ($i/30)"
+            sleep 2
+          done
+
+      # ── Deploy Schema (Phase 1 only) ──
+      - name: Deploy test database
+        env:
+          SQL_PASSWORD: ${{ secrets.CI_SA_PASSWORD }}
+        run: |
+          sqlcmd -S 127.0.0.1,14333 -U sa -P "$SQL_PASSWORD" -C \
+            -i phases/phase1-database/schema/01_create_database.sql
+
+          for f in phases/phase1-database/schema/02a_create_core_tables.sql \
+                   phases/phase1-database/schema/02b_create_clinical_tables.sql \
+                   phases/phase1-database/schema/02c_create_billing_tables.sql \
+                   phases/phase1-database/schema/02d_create_system_tables.sql; do
+            [ -f "$f" ] && sqlcmd -S 127.0.0.1,14333 -U sa -P "$SQL_PASSWORD" \
+              -C -d HospitalBackupDemo -i "$f"
+          done
+
+      # ── Unit Tests ──
+      - name: Schema integrity tests
+        env:
+          SQL_PASSWORD: ${{ secrets.CI_SA_PASSWORD }}
+        run: |
+          sqlcmd -S 127.0.0.1,14333 -U sa -P "$SQL_PASSWORD" \
+            -C -d HospitalBackupDemo \
+            -i phases/phase6-testing/unit-tests/01_schema_integrity.sql \
+            -o test_results.txt 2>&1
+          cat test_results.txt
+          if grep -qi "FAIL" test_results.txt; then
+            echo "::error::Schema integrity tests FAILED"
+            exit 1
+          fi
+
+      # ── Version Check ──
+      - name: Verify tool versions
+        env:
+          SQL_PASSWORD: ${{ secrets.CI_SA_PASSWORD }}
+          SQL_USER: sa
+          SQL_SERVER: 127.0.0.1
+          SQL_PORT: 14333
+          APP_ENV: development
+        run: |
+          source scripts/helpers/load_config.sh 2>/dev/null || true
+          bash scripts/utilities/verify_versions.sh || true
+
+      # ── Notify Failure ──
+      - name: Notify failure
+        if: failure()
+        run: |
+          curl -s -X POST \
+            "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d text="❌ CI FAILED: ${{ github.repository }} | Branch: ${{ github.ref_name }} | By: ${{ github.actor }}" \
+            || true

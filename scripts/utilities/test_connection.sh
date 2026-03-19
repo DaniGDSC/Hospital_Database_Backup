@@ -8,7 +8,7 @@ echo "Port: $SQL_PORT"
 echo "User: $SQL_USER"
 echo ""
 
-sqlcmd -S "$SERVER_CONN" -U "$SQL_USER" -P "$SQL_PASSWORD" -C -Q "
+sqlcmd -S "$SERVER_CONN" -U "$SQL_USER" -P "$SQL_PASSWORD" ${SQLCMD_ENCRYPT_FLAGS} -Q "
 SELECT
     'Server: ' + @@SERVERNAME AS Info
     UNION ALL SELECT 'Version: ' + CAST(SERVERPROPERTY('ProductVersion') AS VARCHAR)

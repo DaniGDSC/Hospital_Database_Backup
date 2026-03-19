@@ -8,7 +8,7 @@ services:
     image: grafana/loki:3.0.0
     container_name: hospital-loki
     ports:
-      - "3100:3100"
+      - "127.0.0.1:3100:3100"
     volumes:
       - ./config/loki-config.yaml:/etc/loki/local-config.yaml:ro
       - loki-data:/loki
@@ -37,7 +37,7 @@ services:
     image: prom/prometheus:v2.53.0
     container_name: hospital-prometheus
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     volumes:
       - ./config/prometheus-config.yaml:/etc/prometheus/prometheus.yml:ro
       - /var/opt/mssql/backup/metrics:/metrics:ro
@@ -50,7 +50,7 @@ services:
     image: prom/node-exporter:v1.8.1
     container_name: hospital-node-exporter
     ports:
-      - "9100:9100"
+      - "127.0.0.1:9100:9100"
     volumes:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
@@ -68,7 +68,7 @@ services:
     image: grafana/grafana:11.0.0
     container_name: hospital-grafana
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
       - GF_SECURITY_SECRET_KEY=${GRAFANA_SECRET_KEY:-defaultsecretkey32chars000000000}

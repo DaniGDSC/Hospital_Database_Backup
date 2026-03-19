@@ -70,6 +70,19 @@ echo "✓ Approval confirmed"
 echo ""
 
 # ============================================
+# GATE 1.5: Version verification
+# ============================================
+echo "--- Gate 1.5: Tool Version Verification ---"
+
+if ! "${SCRIPT_DIR}/utilities/verify_versions.sh"; then
+    echo "BLOCKED: Version mismatch detected — fix before deploying"
+    echo "{\"timestamp\":\"${TIMESTAMP}\",\"deployer\":\"${DEPLOYER}\",\"approver\":\"${DEPLOY_APPROVER}\",\"git_commit\":\"${GIT_COMMIT}\",\"environment\":\"${ENV:-production}\",\"status\":\"BLOCKED\",\"reason\":\"version mismatch\"}" >> "$DEPLOY_LOG"
+    exit 1
+fi
+
+echo ""
+
+# ============================================
 # GATE 2: Pre-deployment checks
 # ============================================
 echo "--- Gate 2: Pre-deployment Validation ---"
@@ -115,7 +128,7 @@ echo ""
 if [ "$DEPLOY_STATUS" = "SUCCESS" ]; then
     echo "--- Gate 4: Post-deployment Verification ---"
 
-    if sqlcmd -S "$SERVER_CONN" -U "$SQL_USER" -P "$SQL_PASSWORD" -C \
+    if sqlcmd -S "$SERVER_CONN" -U "$SQL_USER" -P "$SQL_PASSWORD" ${SQLCMD_ENCRYPT_FLAGS} \
         -Q "SELECT name, state_desc FROM sys.databases WHERE name='HospitalBackupDemo'" \
         -h -1 2>/dev/null | grep -q "ONLINE"; then
         echo "✓ Database is ONLINE"

@@ -47,6 +47,7 @@ declare -A SQLCMD_VARS=(
     [APP_RO_PASSWORD]="APP_RO_PASSWORD"
     [APP_BILLING_PASSWORD]="APP_BILLING_PASSWORD"
     [APP_AUDIT_PASSWORD]="APP_AUDIT_PASSWORD"
+    [DBA_ADMIN_PASSWORD]="DBA_ADMIN_PASSWORD"
 )
 VAR_ARGS=()
 for env_var in "${!SQLCMD_VARS[@]}"; do
@@ -56,7 +57,7 @@ for env_var in "${!SQLCMD_VARS[@]}"; do
 done
 
 sqlcmd -S "$SERVER_CONN" -U "$SQL_USER" -P "$SQL_PASSWORD" -d "$DB_NAME" \
-        -C -i "$SQL_FILE" -o "$LOG_FILE" "${VAR_ARGS[@]}" 2>&1
+        ${SQLCMD_ENCRYPT_FLAGS} -i "$SQL_FILE" -o "$LOG_FILE" "${VAR_ARGS[@]}" 2>&1
 
 EXIT_CODE=$?
 

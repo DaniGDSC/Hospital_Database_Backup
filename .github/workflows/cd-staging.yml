@@ -1,0 +1,85 @@
+name: CD Staging
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: self-hosted
+    environment: staging
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Load staging config
+        run: |
+          echo "APP_ENV=staging" >> "$GITHUB_ENV"
+          echo "ENVIRONMENT=staging" >> "$GITHUB_ENV"
+
+      - name: Version verification
+        env:
+          SQL_PASSWORD: ${{ secrets.STAGING_SQL_PASSWORD }}
+        run: bash scripts/utilities/verify_versions.sh
+
+      - name: Pre-deployment checks
+        env:
+          APP_ENV: staging
+          SQL_PASSWORD: ${{ secrets.STAGING_SQL_PASSWORD }}
+        run: bash scripts/utilities/pre_deployment_check.sh
+
+      - name: Backup staging database
+        env:
+          SQL_PASSWORD: ${{ secrets.STAGING_SQL_PASSWORD }}
+        run: |
+          sqlcmd -S 127.0.0.1,14333 -U "$SQL_USER" \
+            -P "$SQL_PASSWORD" -N -C \
+            -d HospitalBackupDemo_Staging \
+            -Q "EXEC dbo.usp_PerformBackup @BackupType='FULL'" \
+            || echo "::warning::Staging backup skipped (DB may not exist)"
+
+      - name: Deploy to staging
+        env:
+          APP_ENV: staging
+          SQL_PASSWORD: ${{ secrets.STAGING_SQL_PASSWORD }}
+          PRODUCTION_CONFIRMED: "no"
+        run: bash run_all_phases.sh
+
+      - name: Integration tests
+        env:
+          SQL_PASSWORD: ${{ secrets.STAGING_SQL_PASSWORD }}
+        run: |
+          sqlcmd -S 127.0.0.1,14333 -U "$SQL_USER" \
+            -P "$SQL_PASSWORD" -N -C \
+            -d HospitalBackupDemo_Staging \
+            -i phases/phase6-testing/integration-tests/01_backup_restore_roundtrip.sql \
+            -o staging_integration.txt 2>&1
+          cat staging_integration.txt
+          if grep -qi "FAIL" staging_integration.txt; then
+            echo "::error::Integration tests FAILED on staging"
+            exit 1
+          fi
+
+      - name: DR drill on staging
+        env:
+          SQL_PASSWORD: ${{ secrets.STAGING_SQL_PASSWORD }}
+        run: |
+          sqlcmd -S 127.0.0.1,14333 -U "$SQL_USER" \
+            -P "$SQL_PASSWORD" -N -C \
+            -d HospitalBackupDemo_Staging \
+            -i phases/phase6-testing/scenarios/02_disaster_recovery_test_execution.sql \
+            || echo "::warning::DR drill completed with warnings"
+
+      - name: Notify result
+        if: always()
+        run: |
+          STATUS="${{ job.status }}"
+          [ "$STATUS" = "success" ] && EMOJI="✅" || EMOJI="❌"
+          curl -s -X POST \
+            "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d text="${EMOJI} Staging Deploy: ${STATUS} | Commit: ${{ github.sha }} | By: ${{ github.actor }}" \
+            || true

@@ -18,7 +18,7 @@ fi
 # Check database
 echo ""
 echo "2. Database Status:"
-sqlcmd -S "$SERVER_CONN" -U "$SQL_USER" -P "$SQL_PASSWORD" -C -Q "
+sqlcmd -S "$SERVER_CONN" -U "$SQL_USER" -P "$SQL_PASSWORD" ${SQLCMD_ENCRYPT_FLAGS} -Q "
 IF EXISTS (SELECT name FROM sys.databases WHERE name = '$DATABASE_NAME')
     SELECT '   ✓ Database exists: $DATABASE_NAME' AS Status
 ELSE

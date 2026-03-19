@@ -15,7 +15,7 @@ TEMP_FILE="${METRICS_DIR}/.metrics.prom.tmp"
 mkdir -p "$METRICS_DIR"
 
 run_query() {
-    sqlcmd -S "$SERVER_CONN" -U "$SQL_USER" -P "$SQL_PASSWORD" -C \
+    sqlcmd -S "$SERVER_CONN" -U "$SQL_USER" -P "$SQL_PASSWORD" ${SQLCMD_ENCRYPT_FLAGS} \
         -h -1 -W -Q "$1" 2>/dev/null | tr -d ' ' | head -1
 }
 

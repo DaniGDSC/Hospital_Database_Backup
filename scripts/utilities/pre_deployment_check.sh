@@ -45,7 +45,7 @@ fi
 echo ""
 echo -e "${BLUE}[3/7] SQL Server connection${NC}"
 if sqlcmd -S "$SERVER_CONN" -U "$SQL_USER" -P "$SQL_PASSWORD" \
-    -Q "SELECT 1" -C &>/dev/null; then
+    ${SQLCMD_ENCRYPT_FLAGS} -Q "SELECT 1" &>/dev/null; then
     pass "SQL Server reachable at ${SERVER_CONN}"
 else
     fail "Cannot connect to SQL Server at ${SERVER_CONN}"
@@ -64,7 +64,7 @@ fi
 # 5. Last backup within RPO window
 echo ""
 echo -e "${BLUE}[5/7] Backup recency (RPO check)${NC}"
-LAST_BACKUP=$(sqlcmd -S "$SERVER_CONN" -U "$SQL_USER" -P "$SQL_PASSWORD" -C \
+LAST_BACKUP=$(sqlcmd -S "$SERVER_CONN" -U "$SQL_USER" -P "$SQL_PASSWORD" ${SQLCMD_ENCRYPT_FLAGS} \
     -h -1 -Q "SELECT DATEDIFF(MINUTE, MAX(backup_finish_date), GETDATE()) FROM msdb.dbo.backupset WHERE database_name='HospitalBackupDemo'" \
     2>/dev/null | tr -d ' ' || echo "9999")
 
@@ -77,7 +77,7 @@ fi
 # 6. No long-running transactions
 echo ""
 echo -e "${BLUE}[6/7] Active transactions${NC}"
-LONG_TX=$(sqlcmd -S "$SERVER_CONN" -U "$SQL_USER" -P "$SQL_PASSWORD" -C \
+LONG_TX=$(sqlcmd -S "$SERVER_CONN" -U "$SQL_USER" -P "$SQL_PASSWORD" ${SQLCMD_ENCRYPT_FLAGS} \
     -h -1 -Q "SELECT COUNT(*) FROM sys.dm_exec_requests WHERE database_id=DB_ID('HospitalBackupDemo') AND total_elapsed_time > 300000" \
     2>/dev/null | tr -d ' ' || echo "0")
 

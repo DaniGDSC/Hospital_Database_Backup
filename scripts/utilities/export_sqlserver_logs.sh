@@ -18,7 +18,7 @@ log() {
 }
 
 # Export failed logins (security critical)
-sqlcmd -S "$SERVER_CONN" -U "$SQL_USER" -P "$SQL_PASSWORD" -C \
+sqlcmd -S "$SERVER_CONN" -U "$SQL_USER" -P "$SQL_PASSWORD" ${SQLCMD_ENCRYPT_FLAGS} \
     -h -1 -s "," -W -Q "
 SELECT
     CONVERT(VARCHAR(30), EventDate, 126) AS EventTime,
@@ -34,7 +34,7 @@ ORDER BY EventDate DESC
 " 2>/dev/null >> "$EXPORT_FILE" || true
 
 # Export backup events
-sqlcmd -S "$SERVER_CONN" -U "$SQL_USER" -P "$SQL_PASSWORD" -C \
+sqlcmd -S "$SERVER_CONN" -U "$SQL_USER" -P "$SQL_PASSWORD" ${SQLCMD_ENCRYPT_FLAGS} \
     -h -1 -s "," -W -Q "
 SELECT
     CONVERT(VARCHAR(30), backup_finish_date, 126) AS EventTime,
@@ -50,7 +50,7 @@ ORDER BY backup_finish_date DESC
 " 2>/dev/null >> "$EXPORT_FILE" || true
 
 # Export RBAC changes (from SecurityAuditEvents)
-sqlcmd -S "$SERVER_CONN" -U "$SQL_USER" -P "$SQL_PASSWORD" -C \
+sqlcmd -S "$SERVER_CONN" -U "$SQL_USER" -P "$SQL_PASSWORD" ${SQLCMD_ENCRYPT_FLAGS} \
     -h -1 -s "," -W -Q "
 SELECT
     CONVERT(VARCHAR(30), EventTime, 126) AS EventTime,
@@ -65,7 +65,7 @@ ORDER BY EventTime DESC
 " 2>/dev/null >> "$EXPORT_FILE" || true
 
 # Export TDE status
-sqlcmd -S "$SERVER_CONN" -U "$SQL_USER" -P "$SQL_PASSWORD" -C \
+sqlcmd -S "$SERVER_CONN" -U "$SQL_USER" -P "$SQL_PASSWORD" ${SQLCMD_ENCRYPT_FLAGS} \
     -h -1 -s "," -W -Q "
 SELECT
     CONVERT(VARCHAR(30), GETDATE(), 126) AS CheckTime,

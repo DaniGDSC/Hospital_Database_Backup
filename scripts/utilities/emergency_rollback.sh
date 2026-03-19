@@ -56,7 +56,7 @@ fi
 
 # Step 1: Emergency backup before rollback
 log "--- Step 1: Emergency backup ---"
-sqlcmd -S "$SERVER_CONN" -U "$SQL_USER" -P "$SQL_PASSWORD" -C \
+sqlcmd -S "$SERVER_CONN" -U "$SQL_USER" -P "$SQL_PASSWORD" ${SQLCMD_ENCRYPT_FLAGS} \
     -Q "BACKUP DATABASE HospitalBackupDemo TO DISK = '/var/opt/mssql/backup/full/HospitalBackupDemo_PRE_ROLLBACK_${TIMESTAMP}.bak' WITH INIT, COMPRESSION, CHECKSUM" \
     2>&1 | tee -a "$LOG_FILE"
 log "✓ Emergency backup completed"
@@ -76,7 +76,7 @@ ROLLBACK_SCRIPTS=(
 for script in "${ROLLBACK_SCRIPTS[@]}"; do
     if [ -f "$script" ]; then
         log "Executing: $(basename "$script")"
-        sqlcmd -S "$SERVER_CONN" -U "$SQL_USER" -P "$SQL_PASSWORD" -C \
+        sqlcmd -S "$SERVER_CONN" -U "$SQL_USER" -P "$SQL_PASSWORD" ${SQLCMD_ENCRYPT_FLAGS} \
             -d HospitalBackupDemo \
             -i "$script" 2>&1 | tee -a "$LOG_FILE"
         log "  ✓ Completed"
@@ -88,7 +88,7 @@ done
 # Step 3: Verify
 log ""
 log "--- Step 3: Verification ---"
-TABLE_COUNT=$(sqlcmd -S "$SERVER_CONN" -U "$SQL_USER" -P "$SQL_PASSWORD" -C \
+TABLE_COUNT=$(sqlcmd -S "$SERVER_CONN" -U "$SQL_USER" -P "$SQL_PASSWORD" ${SQLCMD_ENCRYPT_FLAGS} \
     -h -1 -Q "SELECT COUNT(*) FROM HospitalBackupDemo.INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE='BASE TABLE'" \
     2>/dev/null | tr -d ' ')
 log "Remaining tables: ${TABLE_COUNT}"
