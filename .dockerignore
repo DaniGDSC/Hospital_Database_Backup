@@ -1,0 +1,32 @@
+# Secrets — NEVER include in Docker image
+.env
+config/project.conf
+*.pvk
+*.cer
+*.pfx
+
+# Logs and reports (runtime data)
+logs/
+reports/
+
+# Git
+.git/
+.github/
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Python cache
+__pycache__
+venv/
+
+# Documentation (not needed in image)
+docs/
+prompt/
+README.md
+
+# Test data
+phases/phase1-database/data/fake/

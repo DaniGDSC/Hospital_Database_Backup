@@ -1,0 +1,8 @@
+# Development overrides — use with:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+# Relaxes port binding and uses Developer edition
+
+services:
+  grafana:
+    ports:
+      - "3000:3000"  # Allow external access for dev tools

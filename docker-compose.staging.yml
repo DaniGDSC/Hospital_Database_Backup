@@ -1,0 +1,8 @@
+# Staging overrides — mirrors production but with staging credentials
+#   docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d
+# All ports remain localhost-bound (same as production)
+
+services:
+  grafana:
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${STAGING_GRAFANA_PASSWORD:-admin}
