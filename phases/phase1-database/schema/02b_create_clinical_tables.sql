@@ -19,6 +19,11 @@ PRINT '';
 
 PRINT 'Creating table: Appointments...';
 
+IF OBJECT_ID('dbo.Appointments', 'U') IS NOT NULL
+BEGIN
+    PRINT '  (already exists — skipping)';
+END
+ELSE
 CREATE TABLE dbo.Appointments (
     AppointmentID INT IDENTITY(1,1) NOT NULL,
     AppointmentNumber NVARCHAR(20) NOT NULL,
@@ -74,6 +79,11 @@ PRINT '  ✓ Appointments created';
 
 PRINT 'Creating table: MedicalRecords...';
 
+IF OBJECT_ID('dbo.MedicalRecords', 'U') IS NOT NULL
+BEGIN
+    PRINT '  (already exists — skipping)';
+END
+ELSE
 CREATE TABLE dbo.MedicalRecords (
     RecordID INT IDENTITY(1,1) NOT NULL,
     RecordNumber NVARCHAR(20) NOT NULL,
@@ -132,6 +142,11 @@ PRINT '  ✓ MedicalRecords created';
 
 PRINT 'Creating table: Prescriptions...';
 
+IF OBJECT_ID('dbo.Prescriptions', 'U') IS NOT NULL
+BEGIN
+    PRINT '  (already exists — skipping)';
+END
+ELSE
 CREATE TABLE dbo.Prescriptions (
     PrescriptionID INT IDENTITY(1,1) NOT NULL,
     PrescriptionNumber NVARCHAR(20) NOT NULL,
@@ -166,7 +181,8 @@ CREATE TABLE dbo.Prescriptions (
     CONSTRAINT FK_Prescriptions_Doctors FOREIGN KEY (DoctorID)
         REFERENCES dbo.Doctors(DoctorID),
     CONSTRAINT CHK_Prescriptions_Refills CHECK (RefillsAllowed >= 0),
-    CONSTRAINT CHK_Prescriptions_Cost CHECK (TotalCost >= 0)
+    CONSTRAINT CHK_Prescriptions_Cost CHECK (TotalCost >= 0),
+    CONSTRAINT CHK_Prescriptions_Dates CHECK (EndDate IS NULL OR EndDate >= StartDate)
 );
 GO
 
@@ -178,6 +194,11 @@ PRINT '  ✓ Prescriptions created';
 
 PRINT 'Creating table: PrescriptionDetails...';
 
+IF OBJECT_ID('dbo.PrescriptionDetails', 'U') IS NOT NULL
+BEGIN
+    PRINT '  (already exists — skipping)';
+END
+ELSE
 CREATE TABLE dbo.PrescriptionDetails (
     DetailID INT IDENTITY(1,1) NOT NULL,
     PrescriptionID INT NOT NULL,
@@ -224,6 +245,11 @@ PRINT '  ✓ PrescriptionDetails created';
 
 PRINT 'Creating table: LabTests...';
 
+IF OBJECT_ID('dbo.LabTests', 'U') IS NOT NULL
+BEGIN
+    PRINT '  (already exists — skipping)';
+END
+ELSE
 CREATE TABLE dbo.LabTests (
     LabTestID INT IDENTITY(1,1) NOT NULL,
     TestNumber NVARCHAR(20) NOT NULL,
@@ -287,6 +313,11 @@ PRINT '  ✓ LabTests created';
 
 PRINT 'Creating table: Admissions...';
 
+IF OBJECT_ID('dbo.Admissions', 'U') IS NOT NULL
+BEGIN
+    PRINT '  (already exists — skipping)';
+END
+ELSE
 CREATE TABLE dbo.Admissions (
     AdmissionID INT IDENTITY(1,1) NOT NULL,
     AdmissionNumber NVARCHAR(20) NOT NULL,

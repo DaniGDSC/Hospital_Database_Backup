@@ -19,6 +19,11 @@ PRINT '';
 
 PRINT 'Creating table: Departments...';
 
+IF OBJECT_ID('dbo.Departments', 'U') IS NOT NULL
+BEGIN
+    PRINT '  (already exists — skipping)';
+END
+ELSE
 CREATE TABLE dbo.Departments (
     DepartmentID INT IDENTITY(1,1) NOT NULL,
     DepartmentCode NVARCHAR(10) NOT NULL,
@@ -53,6 +58,11 @@ PRINT '  ✓ Departments created';
 
 PRINT 'Creating table: Doctors...';
 
+IF OBJECT_ID('dbo.Doctors', 'U') IS NOT NULL
+BEGIN
+    PRINT '  (already exists — skipping)';
+END
+ELSE
 CREATE TABLE dbo.Doctors (
     DoctorID INT IDENTITY(1,1) NOT NULL,
     EmployeeCode NVARCHAR(20) NOT NULL,
@@ -94,7 +104,7 @@ CREATE TABLE dbo.Doctors (
     CONSTRAINT UK_Doctors_NationalID UNIQUE (NationalID),
     CONSTRAINT FK_Doctors_Departments FOREIGN KEY (DepartmentID)
         REFERENCES dbo.Departments(DepartmentID),
-    CONSTRAINT CHK_Doctors_Age CHECK (DATEDIFF(YEAR, DateOfBirth, GETDATE()) >= 25),
+    CONSTRAINT CHK_Doctors_DOB CHECK (DateOfBirth <= DATEADD(YEAR, -25, GETDATE())),
     CONSTRAINT CHK_Doctors_Salary CHECK (BaseSalary >= 0),
     CONSTRAINT CHK_Doctors_ConsultationFee CHECK (ConsultationFee >= 0)
 );
@@ -103,9 +113,10 @@ GO
 PRINT '  ✓ Doctors created';
 
 -- Add FK for Department Head (circular reference)
-ALTER TABLE dbo.Departments
-ADD CONSTRAINT FK_Departments_HeadDoctor FOREIGN KEY (HeadDoctorID)
-    REFERENCES dbo.Doctors(DoctorID);
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_Departments_HeadDoctor')
+    ALTER TABLE dbo.Departments
+    ADD CONSTRAINT FK_Departments_HeadDoctor FOREIGN KEY (HeadDoctorID)
+        REFERENCES dbo.Doctors(DoctorID);
 GO
 
 PRINT '  ✓ Department Head FK added';
@@ -116,6 +127,11 @@ PRINT '  ✓ Department Head FK added';
 
 PRINT 'Creating table: Nurses...';
 
+IF OBJECT_ID('dbo.Nurses', 'U') IS NOT NULL
+BEGIN
+    PRINT '  (already exists — skipping)';
+END
+ELSE
 CREATE TABLE dbo.Nurses (
     NurseID INT IDENTITY(1,1) NOT NULL,
     EmployeeCode NVARCHAR(20) NOT NULL,
@@ -147,7 +163,7 @@ CREATE TABLE dbo.Nurses (
     CONSTRAINT UK_Nurses_NationalID UNIQUE (NationalID),
     CONSTRAINT FK_Nurses_Departments FOREIGN KEY (DepartmentID)
         REFERENCES dbo.Departments(DepartmentID),
-    CONSTRAINT CHK_Nurses_Age CHECK (DATEDIFF(YEAR, DateOfBirth, GETDATE()) >= 20),
+    CONSTRAINT CHK_Nurses_DOB CHECK (DateOfBirth <= DATEADD(YEAR, -20, GETDATE())),
     CONSTRAINT CHK_Nurses_Salary CHECK (BaseSalary >= 0)
 );
 GO
@@ -160,6 +176,11 @@ PRINT '  ✓ Nurses created';
 
 PRINT 'Creating table: Patients...';
 
+IF OBJECT_ID('dbo.Patients', 'U') IS NOT NULL
+BEGIN
+    PRINT '  (already exists — skipping)';
+END
+ELSE
 CREATE TABLE dbo.Patients (
     PatientID INT IDENTITY(1,1) NOT NULL,
     PatientCode NVARCHAR(20) NOT NULL,
@@ -212,6 +233,11 @@ PRINT '  ✓ Patients created';
 
 PRINT 'Creating table: Rooms...';
 
+IF OBJECT_ID('dbo.Rooms', 'U') IS NOT NULL
+BEGIN
+    PRINT '  (already exists — skipping)';
+END
+ELSE
 CREATE TABLE dbo.Rooms (
     RoomID INT IDENTITY(1,1) NOT NULL,
     RoomNumber NVARCHAR(10) NOT NULL,

@@ -19,6 +19,11 @@ PRINT '';
 
 PRINT 'Creating table: AuditLog...';
 
+IF OBJECT_ID('dbo.AuditLog', 'U') IS NOT NULL
+BEGIN
+    PRINT '  (already exists — skipping)';
+END
+ELSE
 CREATE TABLE dbo.AuditLog (
     AuditID BIGINT IDENTITY(1,1) NOT NULL,
     AuditDate DATETIME2 DEFAULT SYSDATETIME(),
@@ -59,6 +64,11 @@ PRINT '  ✓ AuditLog created';
 
 PRINT 'Creating table: BackupHistory...';
 
+IF OBJECT_ID('dbo.BackupHistory', 'U') IS NOT NULL
+BEGIN
+    PRINT '  (already exists — skipping)';
+END
+ELSE
 CREATE TABLE dbo.BackupHistory (
     BackupHistoryID INT IDENTITY(1,1) NOT NULL,
     BackupType NVARCHAR(20) CHECK (BackupType IN ('Full', 'Differential', 'Transaction Log')) NOT NULL,
@@ -117,6 +127,11 @@ PRINT '  ✓ BackupHistory created';
 
 PRINT 'Creating table: SecurityEvents...';
 
+IF OBJECT_ID('dbo.SecurityEvents', 'U') IS NOT NULL
+BEGIN
+    PRINT '  (already exists — skipping)';
+END
+ELSE
 CREATE TABLE dbo.SecurityEvents (
     EventID BIGINT IDENTITY(1,1) NOT NULL,
     EventDate DATETIME2 DEFAULT SYSDATETIME(),
@@ -157,6 +172,11 @@ PRINT '  ✓ SecurityEvents created';
 
 PRINT 'Creating table: SystemConfiguration...';
 
+IF OBJECT_ID('dbo.SystemConfiguration', 'U') IS NOT NULL
+BEGIN
+    PRINT '  (already exists — skipping)';
+END
+ELSE
 CREATE TABLE dbo.SystemConfiguration (
     ConfigID INT IDENTITY(1,1) NOT NULL,
     ConfigKey NVARCHAR(100) NOT NULL,

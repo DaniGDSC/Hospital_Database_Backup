@@ -19,6 +19,11 @@ PRINT '';
 
 PRINT 'Creating table: Billing...';
 
+IF OBJECT_ID('dbo.Billing', 'U') IS NOT NULL
+BEGIN
+    PRINT '  (already exists — skipping)';
+END
+ELSE
 CREATE TABLE dbo.Billing (
     BillingID INT IDENTITY(1,1) NOT NULL,
     InvoiceNumber NVARCHAR(50) NOT NULL,
@@ -38,10 +43,11 @@ CREATE TABLE dbo.Billing (
     AdjustmentReason NVARCHAR(200),
     TotalAmount AS (SubTotal + (SubTotal * TaxRate / 100) - Discount + AdjustmentAmount) PERSISTED,
     AmountPaid DECIMAL(15,2) DEFAULT 0,
-    Balance AS (SubTotal + (SubTotal * TaxRate / 100) - Discount + AdjustmentAmount - AmountPaid),
+    Balance AS (SubTotal + (SubTotal * TaxRate / 100) - Discount + AdjustmentAmount - AmountPaid) PERSISTED,
     PaymentStatus NVARCHAR(20) CHECK (PaymentStatus IN ('Pending', 'Partial', 'Paid', 'Overdue', 'Cancelled', 'Refunded')) DEFAULT 'Pending',
     PaymentDueDate DATE,
     OverdueDays AS (CASE WHEN PaymentStatus IN ('Pending', 'Partial', 'Overdue')
+                              AND PaymentDueDate IS NOT NULL
                          THEN DATEDIFF(DAY, PaymentDueDate, GETDATE())
                          ELSE 0 END),
     InsuranceClaimNumber NVARCHAR(50),
@@ -83,6 +89,11 @@ PRINT '  ✓ Billing created';
 
 PRINT 'Creating table: BillingDetails...';
 
+IF OBJECT_ID('dbo.BillingDetails', 'U') IS NOT NULL
+BEGIN
+    PRINT '  (already exists — skipping)';
+END
+ELSE
 CREATE TABLE dbo.BillingDetails (
     DetailID INT IDENTITY(1,1) NOT NULL,
     BillingID INT NOT NULL,
@@ -122,6 +133,11 @@ PRINT '  ✓ BillingDetails created';
 
 PRINT 'Creating table: Payments...';
 
+IF OBJECT_ID('dbo.Payments', 'U') IS NOT NULL
+BEGIN
+    PRINT '  (already exists — skipping)';
+END
+ELSE
 CREATE TABLE dbo.Payments (
     PaymentID INT IDENTITY(1,1) NOT NULL,
     PaymentNumber NVARCHAR(20) NOT NULL,

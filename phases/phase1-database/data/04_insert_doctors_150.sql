@@ -9,14 +9,23 @@ SET NOCOUNT ON;
 
 PRINT '=== Inserting 150 Sample Doctors ===';
 
+-- Specialty lookup table for clean random selection
+DECLARE @Specialties TABLE (ID INT IDENTITY(1,1), Name NVARCHAR(100));
+INSERT INTO @Specialties (Name) VALUES
+    ('Cardiology'), ('Neurology'), ('Orthopedics'), ('Gastroenterology'),
+    ('Pulmonology'), ('Nephrology'), ('Oncology'), ('Pediatrics'),
+    ('OB/GYN'), ('Psychiatry'), ('Dermatology'), ('ENT'),
+    ('Ophthalmology'), ('General Medicine'), ('Surgery');
+
+DECLARE @SpecialtyCount INT = (SELECT COUNT(*) FROM @Specialties);
 DECLARE @Counter INT = 1;
 DECLARE @DeptID INT;
+DECLARE @Specialty NVARCHAR(100);
 
 WHILE @Counter <= 150
 BEGIN
     SET @DeptID = (SELECT TOP 1 DepartmentID FROM Departments ORDER BY NEWID());
-    DECLARE @SpecialtyList NVARCHAR(MAX) = 'Cardiology,Neurology,Orthopedics,Gastroenterology,Pulmonology,Nephrology,Oncology,Pediatrics,OB/GYN,Psychiatry,Dermatology,ENT,Ophthalmology,General Medicine,Surgery';
-    DECLARE @Specialty NVARCHAR(100) = (SELECT SUBSTRING(@SpecialtyList, CAST(RAND()*14 AS INT)*20+1, 20));
+    SET @Specialty = (SELECT TOP 1 Name FROM @Specialties WHERE ID = (CAST(RAND() * @SpecialtyCount AS INT) + 1));
     
     INSERT INTO dbo.Doctors 
     (EmployeeCode, FirstName, LastName, DateOfBirth, Gender, NationalID, DepartmentID, 

@@ -285,6 +285,35 @@ BEGIN
 END
 GO
 
+-- Additional indexes identified during review
+-- Admissions: DischargeDate range queries
+IF OBJECT_ID('dbo.Admissions', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Admissions_DischargeDate' AND object_id = OBJECT_ID('dbo.Admissions'))
+        CREATE INDEX IX_Admissions_DischargeDate ON dbo.Admissions (DischargeDate) INCLUDE (PatientID, Status);
+    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Admissions_Status' AND object_id = OBJECT_ID('dbo.Admissions'))
+        CREATE INDEX IX_Admissions_Status ON dbo.Admissions (Status) INCLUDE (PatientID, AdmissionDate);
+END
+GO
+
+-- Billing: PaymentStatus analytics
+IF OBJECT_ID('dbo.Billing', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Billing_PaymentStatus' AND object_id = OBJECT_ID('dbo.Billing'))
+        CREATE INDEX IX_Billing_PaymentStatus ON dbo.Billing (PaymentStatus) INCLUDE (PatientID, TotalAmount, Balance);
+    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Billing_DueDate' AND object_id = OBJECT_ID('dbo.Billing'))
+        CREATE INDEX IX_Billing_DueDate ON dbo.Billing (PaymentDueDate) WHERE PaymentStatus IN ('Pending', 'Partial', 'Overdue');
+END
+GO
+
+-- MedicalRecords: Diagnosis searches
+IF OBJECT_ID('dbo.MedicalRecords', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_MedicalRecords_DiagnosisCode' AND object_id = OBJECT_ID('dbo.MedicalRecords'))
+        CREATE INDEX IX_MedicalRecords_DiagnosisCode ON dbo.MedicalRecords (DiagnosisCode) INCLUDE (PatientID, DoctorID, VisitDate);
+END
+GO
+
 PRINT '✓ Index creation completed.';
 GO
 
